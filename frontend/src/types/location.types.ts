@@ -65,3 +65,18 @@ export interface Route {
   startedAt?: Date;
   completedAt?: Date;
 }
+export interface Trip {
+  _id: string;
+  driverId: string;
+
+  startPoint: Coordinates;
+  endPoint?: Coordinates;
+
+  distance?: number; // km
+  duration?: number; // minutes
+
+  status: 'pending' | 'active' | 'completed' | 'cancelled';
+
+  createdAt?: Date;
+  completedAt?: Date;
+}

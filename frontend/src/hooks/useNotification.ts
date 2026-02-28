@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface NotificationOptions {
   title: string;
@@ -53,7 +53,6 @@ export const useNotification = () => {
         tag: options.tag,
         requireInteraction: options.requireInteraction || true,
         silent: options.silent || false,
-        vibrate: [200, 100, 200],
       });
 
       if (options.onClick) {

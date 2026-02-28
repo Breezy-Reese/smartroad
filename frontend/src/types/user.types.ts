@@ -1,3 +1,4 @@
+import { Coordinates } from "./location.types";
 export type UserRole = 'driver' | 'hospital' | 'admin' | 'responder';
 
 export interface User {

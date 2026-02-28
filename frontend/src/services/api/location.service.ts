@@ -1,4 +1,4 @@
-import { axiosInstance } from './axiosInstance';
+import axiosInstance from './axiosInstance';
 import { Coordinates, LocationData, DriverLocation, Route } from '../../types/location.types';
 
 class LocationService {

@@ -1,4 +1,4 @@
-import { axiosInstance } from './axiosInstance';
+import axiosInstance from './axiosInstance';
 import { LoginCredentials, RegisterData, AuthResponse, User } from '../../types/user.types';
 
 class AuthService {

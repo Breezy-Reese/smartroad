@@ -1,3 +1,4 @@
+import { Coordinates } from "./location.types";
 import { Incident, EmergencyAlert, ResponderInfo } from './incident.types';
 import { DriverLocation, ResponderLocation } from './location.types';
 
