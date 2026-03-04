@@ -3,29 +3,58 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { ShieldExclamationIcon } from '@heroicons/react/24/outline';
 
+/* ================= TYPES ================= */
+
+type UserRole = 'driver' | 'hospital';
+
+interface RegisterForm {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  role: UserRole;
+  phone: string;
+  licenseNumber: string;
+  hospitalName: string;
+}
+
+/* ======================================== */
+
 const Register: React.FC = () => {
-  const [formData, setFormData] = useState({
+  const navigate = useNavigate();
+  const { register } = useAuth();
+
+  const [formData, setFormData] = useState<RegisterForm>({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'driver' as const,
+    role: 'driver',
     phone: '',
     licenseNumber: '',
     hospitalName: '',
   });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
-  const { register } = useAuth();
-  const navigate = useNavigate();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  /* ================= HANDLE CHANGE ================= */
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+
+    setFormData(prev => ({
+      ...prev,
+      [name]:
+        name === 'role'
+          ? (value as UserRole)
+          : value,
+    }));
   };
+
+  /* ================= SUBMIT ================= */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,13 +68,21 @@ const Register: React.FC = () => {
     setLoading(true);
 
     try {
-      await register(formData);
+      // Remove confirmPassword before sending
+      const { confirmPassword, ...payload } = formData;
+
+      await register(payload);
+
+      // Optional redirect after success
+      navigate('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Registration failed');
+      setError(err?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
+
+  /* ================= UI ================= */
 
   return (
     <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8">
@@ -55,7 +92,11 @@ const Register: React.FC = () => {
             <ShieldExclamationIcon className="h-12 w-12 text-white" />
           </div>
         </div>
-        <h2 className="text-3xl font-bold text-gray-900">Create Account</h2>
+
+        <h2 className="text-3xl font-bold text-gray-900">
+          Create Account
+        </h2>
+
         <p className="text-sm text-gray-600 mt-2">
           Join the emergency response network
         </p>
@@ -68,55 +109,40 @@ const Register: React.FC = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Full Name
-          </label>
-          <input
-            type="text"
-            name="name"
-            required
-            value={formData.name}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emergency-500"
-            placeholder="Enter your full name"
-          />
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email Address
-          </label>
-          <input
-            type="email"
-            name="email"
-            required
-            value={formData.email}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emergency-500"
-            placeholder="Enter your email"
-          />
-        </div>
+        {/* NAME */}
+        <InputField
+          label="Full Name"
+          name="name"
+          type="text"
+          value={formData.name}
+          onChange={handleChange}
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Phone Number
-          </label>
-          <input
-            type="tel"
-            name="phone"
-            required
-            value={formData.phone}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emergency-500"
-            placeholder="Enter your phone number"
-          />
-        </div>
+        {/* EMAIL */}
+        <InputField
+          label="Email Address"
+          name="email"
+          type="email"
+          value={formData.email}
+          onChange={handleChange}
+        />
 
+        {/* PHONE */}
+        <InputField
+          label="Phone Number"
+          name="phone"
+          type="tel"
+          value={formData.phone}
+          onChange={handleChange}
+        />
+
+        {/* ROLE */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Role
           </label>
+
           <select
             name="role"
             value={formData.role}
@@ -128,69 +154,45 @@ const Register: React.FC = () => {
           </select>
         </div>
 
+        {/* DRIVER FIELD */}
         {formData.role === 'driver' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Driver's License Number
-            </label>
-            <input
-              type="text"
-              name="licenseNumber"
-              required
-              value={formData.licenseNumber}
-              onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emergency-500"
-              placeholder="Enter your license number"
-            />
-          </div>
+          <InputField
+            label="Driver License Number"
+            name="licenseNumber"
+            type="text"
+            value={formData.licenseNumber}
+            onChange={handleChange}
+          />
         )}
 
+        {/* HOSPITAL FIELD */}
         {formData.role === 'hospital' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Hospital Name
-            </label>
-            <input
-              type="text"
-              name="hospitalName"
-              required
-              value={formData.hospitalName}
-              onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emergency-500"
-              placeholder="Enter hospital name"
-            />
-          </div>
+          <InputField
+            label="Hospital Name"
+            name="hospitalName"
+            type="text"
+            value={formData.hospitalName}
+            onChange={handleChange}
+          />
         )}
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Password
-          </label>
-          <input
-            type="password"
-            name="password"
-            required
-            value={formData.password}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emergency-500"
-            placeholder="Create a password"
-          />
-        </div>
+        {/* PASSWORD */}
+        <InputField
+          label="Password"
+          name="password"
+          type="password"
+          value={formData.password}
+          onChange={handleChange}
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Confirm Password
-          </label>
-          <input
-            type="password"
-            name="confirmPassword"
-            required
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emergency-500"
-            placeholder="Confirm your password"
-          />
-        </div>
+        {/* CONFIRM PASSWORD */}
+        <InputField
+          label="Confirm Password"
+          name="confirmPassword"
+          type="password"
+          value={formData.confirmPassword}
+          onChange={handleChange}
+        />
 
         <button
           type="submit"
@@ -204,7 +206,10 @@ const Register: React.FC = () => {
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
           Already have an account?{' '}
-          <Link to="/login" className="font-medium text-emergency-600 hover:text-emergency-500">
+          <Link
+            to="/login"
+            className="font-medium text-emergency-600 hover:text-emergency-500"
+          >
             Sign in
           </Link>
         </p>
@@ -212,5 +217,38 @@ const Register: React.FC = () => {
     </div>
   );
 };
+
+/* ================= REUSABLE INPUT COMPONENT ================= */
+
+interface InputProps {
+  label: string;
+  name: string;
+  type: string;
+  value: string;
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+}
+
+const InputField: React.FC<InputProps> = ({
+  label,
+  name,
+  type,
+  value,
+  onChange,
+}) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-2">
+      {label}
+    </label>
+
+    <input
+      type={type}
+      name={name}
+      required
+      value={value}
+      onChange={onChange}
+      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emergency-500"
+    />
+  </div>
+);
 
 export default Register;

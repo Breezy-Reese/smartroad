@@ -1,4 +1,4 @@
-import { IncidentSeverity } from '../../types/incident.types';
+import { IncidentSeverity } from '../../types/emergency.types';
 
 export const getEmergencyPriority = (severity: IncidentSeverity): number => {
   const priorities = {

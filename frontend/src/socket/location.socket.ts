@@ -1,6 +1,6 @@
 import { Socket } from 'socket.io-client';
-import { ServerToClientEvents, ClientToServerEvents } from '../../types/socket.types';
-import { DriverLocation } from '../../types/location.types';
+import { ServerToClientEvents, ClientToServerEvents } from 'types/socket.types';
+import { DriverLocation } from 'types/location.types';
 
 export class LocationSocket {
   constructor(private socket: Socket<ServerToClientEvents, ClientToServerEvents>) {}

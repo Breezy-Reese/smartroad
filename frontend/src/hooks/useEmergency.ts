@@ -3,7 +3,7 @@ import { useSocket } from './useSocket';
 import { useLocation } from './useLocation';
 import { useAuth } from './useAuth';
 import { emergencyService } from '../services/api/emergency.service';
-import { Incident, CreateIncidentDto, EmergencyAlert } from '../types/incident.types';
+import { Incident, CreateIncidentDto, EmergencyAlert } from '../types/emergency.types';
 import { Coordinates } from '../types/location.types';
 import { toast } from 'react-hot-toast';
 
@@ -244,6 +244,8 @@ export const useEmergency = (): UseEmergencyReturn => {
         location: {
           lat: currentLocation.lat,
           lng: currentLocation.lng,
+          latitude: 0,
+          longitude: 0
         },
         type: type === 'panic' ? 'other' : 'collision',
         severity: 'critical',

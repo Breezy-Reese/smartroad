@@ -5,8 +5,8 @@ import {
   UpdateIncidentDto,
   IncidentReport,
   EmergencyAlert,
-  IncidentStats 
-} from '../../types/incident.types';
+  IncidentStatus 
+} from '../../types/emergency.types';
 import { Coordinates } from '../../types/location.types';
 
 class EmergencyService {
@@ -63,8 +63,8 @@ class EmergencyService {
     return response.data;
   }
 
-  async getIncidentStats(params?: any): Promise<IncidentStats> {
-    const response = await axiosInstance.get<IncidentStats>(`${this.baseUrl}/stats`, { params });
+  async getIncidentStats(params?: any): Promise<IncidentStatus> {
+    const response = await axiosInstance.get<IncidentStatus>(`${this.baseUrl}/stats`, { params });
     return response.data;
   }
 

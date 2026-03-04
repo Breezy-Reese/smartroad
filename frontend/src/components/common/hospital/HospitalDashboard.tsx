@@ -5,6 +5,7 @@ import { useSocket } from '../../../hooks/useSocket';
 import { emergencyService } from '../../../services/api/emergency.service';
 import IncidentCard from "../Cards/IncidentCard";
 import StatsCard from "../Cards/StatsCard";
+import { Hospital } from '../../../types/user.types';
 import IncidentMap from "../Maps/IncidentMap";
 import {
   TruckIcon,
@@ -13,7 +14,7 @@ import {
   BellIcon,
   BuildingOfficeIcon,
 } from '@heroicons/react/24/outline';
-import { Incident } from "../../../types/incident.types";
+import { Incident } from "../../../types/emergency.types";
 import { toast } from 'react-hot-toast';
 
 const HospitalDashboard: React.FC = () => {
@@ -72,7 +73,7 @@ const HospitalDashboard: React.FC = () => {
 
   const handleNewIncident = (incident: Incident) => {
     setIncidents(prev => [incident, ...prev]);
-    toast.error(`🚨 New accident reported at ${new Date(incident.timestamp).toLocaleTimeString()}`, {
+    toast.error(`🚨 New accident reported at ${incident.timestamp && new Date(incident.timestamp).toLocaleTimeString()}`, {
       duration: 0,
       icon: '🚨',
     });
@@ -120,8 +121,7 @@ const HospitalDashboard: React.FC = () => {
               Hospital Emergency Dashboard
             </h1>
             <p className="text-gray-600 mt-1">
-              {user?.hospitalName || 'City General Hospital'}
-            </p>
+           {(user as any)?.hospitalName || 'City General Hospital'}            </p>
           </div>
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
@@ -197,7 +197,7 @@ const HospitalDashboard: React.FC = () => {
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Active Incidents</h2>
-          <span className="bg-emergency-100 text-emergemy-800 text-sm px-3 py-1 rounded-full">
+          <span className="bg-emergency-100 text-emergency-800 text-sm px-3 py-1 rounded-full">
             {incidents.length} active
           </span>
         </div>

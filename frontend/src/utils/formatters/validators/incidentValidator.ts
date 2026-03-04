@@ -1,5 +1,5 @@
-import { Coordinates } from '../../types/location.types';
-import { IncidentSeverity, IncidentType } from '../../types/incident.types';
+import { Coordinates } from 'types/location.types';
+import { IncidentSeverity, IncidentType } from 'types/emergency.types';
 
 export interface IncidentValidationResult {
   isValid: boolean;

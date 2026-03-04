@@ -1,8 +1,10 @@
+/* ================= COORDINATES ================= */
 export interface Coordinates {
   lat: number;
   lng: number;
 }
 
+/* ================= LOCATION DATA ================= */
 export interface LocationData {
   lat: number;
   lng: number;
@@ -11,9 +13,10 @@ export interface LocationData {
   heading?: number;
   altitude?: number;
   altitudeAccuracy?: number;
-  timestamp: Date;
+  timestamp: Date | string; // ISO string or Date object
 }
 
+/* ================= DRIVER LOCATION ================= */
 export interface DriverLocation extends LocationData {
   driverId: string;
   driverName?: string;
@@ -21,6 +24,7 @@ export interface DriverLocation extends LocationData {
   status?: 'driving' | 'idle' | 'stopped' | 'emergency';
 }
 
+/* ================= HOSPITAL LOCATION ================= */
 export interface HospitalLocation {
   hospitalId: string;
   hospitalName: string;
@@ -31,6 +35,7 @@ export interface HospitalLocation {
   availableAmbulances: number;
 }
 
+/* ================= RESPONDER LOCATION ================= */
 export interface ResponderLocation {
   responderId: string;
   responderName: string;
@@ -38,20 +43,22 @@ export interface ResponderLocation {
   location: Coordinates;
   status: 'available' | 'en-route' | 'busy' | 'offline';
   destination?: Coordinates;
-  eta?: number;
+  eta?: number; // in minutes
 }
 
+/* ================= GEOFENCE ================= */
 export interface Geofence {
   _id: string;
   name: string;
   type: 'circle' | 'polygon';
   center?: Coordinates;
-  radius?: number;
+  radius?: number; // in meters
   points?: Coordinates[];
   alertOnEntry: boolean;
   alertOnExit: boolean;
 }
 
+/* ================= ROUTE ================= */
 export interface Route {
   _id: string;
   driverId: string;
@@ -59,24 +66,24 @@ export interface Route {
   startPoint: Coordinates;
   endPoint?: Coordinates;
   waypoints: Coordinates[];
-  distance: number;
-  duration: number;
+  distance: number; // km
+  duration: number; // minutes
   status: 'planned' | 'active' | 'completed' | 'abandoned';
-  startedAt?: Date;
-  completedAt?: Date;
+  startedAt?: Date | string;
+  completedAt?: Date | string;
 }
+
+/* ================= TRIP ================= */
 export interface Trip {
   _id: string;
   driverId: string;
-
   startPoint: Coordinates;
   endPoint?: Coordinates;
-
   distance?: number; // km
   duration?: number; // minutes
-
   status: 'pending' | 'active' | 'completed' | 'cancelled';
-
-  createdAt?: Date;
-  completedAt?: Date;
+  createdAt?: Date | string;
+  completedAt?: Date | string;
+  waypoints?: Coordinates[]; // optional
+  startedAt?: Date | string; // optional
 }

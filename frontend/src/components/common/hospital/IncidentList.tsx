@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { emergencyService } from '../../../services/api/emergency.service';
-import { Incident } from "../../../types/incident.types";
+import { Incident } from "../../../types/emergency.types";
 import { format } from 'date-fns';
 import {
   FunnelIcon,
@@ -56,21 +56,21 @@ const IncidentList: React.FC = () => {
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(inc =>
-        inc.incidentId.toLowerCase().includes(searchLower) ||
-        inc.driver?.name?.toLowerCase().includes(searchLower) ||
+        (inc.incidentId ?? '').toLowerCase().includes(searchLower) ||
+        inc.driverId?.name?.toLowerCase().includes(searchLower) ||
         inc.vehicleNumber?.toLowerCase().includes(searchLower)
       );
     }
 
     if (filters.startDate) {
       filtered = filtered.filter(inc =>
-        new Date(inc.timestamp) >= new Date(filters.startDate)
+        inc.timestamp ? new Date(inc.timestamp) : new Date() >= new Date(filters.startDate)
       );
     }
 
     if (filters.endDate) {
       filtered = filtered.filter(inc =>
-        new Date(inc.timestamp) <= new Date(filters.endDate)
+       inc.timestamp ? new Date(inc.timestamp) : new Date() <= new Date(filters.endDate)
       );
     }
 
@@ -229,10 +229,10 @@ const IncidentList: React.FC = () => {
               {filteredIncidents.map((incident) => (
                 <tr key={incident._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap font-mono text-sm">
-                    {incident.incidentId.slice(-8)}
+                    {incident.incidentId?.slice(-8) ?? 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {format(new Date(incident.timestamp), 'HH:mm, MMM dd')}
+                    {format(new Date(incident.timestamp ?? new Date()), 'HH:mm, MMM dd')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {incident.location.lat.toFixed(4)}, {incident.location.lng.toFixed(4)}

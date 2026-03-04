@@ -1,120 +1,143 @@
-import { Coordinates } from "./location.types";
-import { Incident, EmergencyAlert, ResponderInfo } from './incident.types';
-import { DriverLocation, ResponderLocation } from './location.types';
+// src/types/socket.types.ts
 
-export type SocketEvent = 
+import { Coordinates, DriverLocation, ResponderLocation } from './location.types';
+import { Incident, EmergencyAlert, ResponderInfo } from './emergency.types';
+
+/* ================= SOCKET EVENT TYPES ================= */
+
+export type SocketEvent =
   | 'connect'
   | 'disconnect'
   | 'error'
   | 'location-update'
   | 'new-incident'
   | 'incident-update'
+  | 'incident-resolved'
+  | 'incident-cancelled'
   | 'responder-accepted'
   | 'responder-update'
+  | 'responder-location'
   | 'driver-status-change'
   | 'emergency-alert'
   | 'panic-button'
-  | 'hospital-stats-update';
+  | 'hospital-stats-update'
+  | 'system-notification';
+
+/* ================= SERVER → CLIENT EVENTS ================= */
 
 export interface ServerToClientEvents {
-  // Location Events
+
+  /* Location */
   'location-update': (data: DriverLocation) => void;
-  'driver-status-change': (data: { 
-    driverId: string; 
+
+  'driver-status-change': (data: {
+    driverId: string;
     status: 'online' | 'offline' | 'driving' | 'emergency';
     location?: Coordinates;
   }) => void;
-  
-  // Incident Events
+
+  /* Incident */
   'new-incident': (incident: Incident) => void;
   'incident-update': (incident: Incident) => void;
   'incident-resolved': (incidentId: string) => void;
   'incident-cancelled': (incidentId: string) => void;
-  
-  // Responder Events
-  'responder-accepted': (data: { 
-    incidentId: string; 
+
+  /* Responders */
+  'responder-accepted': (data: {
+    incidentId: string;
     responder: ResponderInfo;
     hospitalId: string;
   }) => void;
-  'responder-update': (data: { 
-    incidentId: string; 
+
+  'responder-update': (data: {
+    incidentId: string;
     responders: ResponderInfo[];
   }) => void;
+
   'responder-location': (data: ResponderLocation) => void;
-  
-  // Emergency Events
+
+  /* Emergency */
   'emergency-alert': (alert: EmergencyAlert) => void;
-  'panic-alert': (data: { 
-    driverId: string; 
+
+  'panic-alert': (data: {
+    driverId: string;
     driverName: string;
     location: Coordinates;
     timestamp: Date;
   }) => void;
-  
-  // Hospital Events
+
+  /* Hospital */
   'hospital-stats-update': (data: {
     hospitalId: string;
     stats: any;
   }) => void;
-  
-  // System Events
-  'system-notification': (data: { 
+
+  /* System */
+  'system-notification': (data: {
     type: 'info' | 'warning' | 'error' | 'success';
     title: string;
     message: string;
     timeout?: number;
   }) => void;
-  'error': (error: { 
-    message: string; 
+
+  'error': (error: {
+    message: string;
     code: string;
     timestamp: Date;
   }) => void;
 }
 
+/* ================= CLIENT → SERVER EVENTS ================= */
+
 export interface ClientToServerEvents {
-  // Location Events
+
+  /* Location */
   'location-update': (data: DriverLocation) => void;
   'start-tracking': (driverId: string) => void;
   'stop-tracking': (driverId: string) => void;
-  
-  // Incident Events
+
+  /* Incident */
   'report-incident': (data: Partial<Incident>) => void;
   'confirm-incident': (incidentId: string) => void;
-  'update-incident-status': (data: { 
-    incidentId: string; 
+  'update-incident-status': (data: {
+    incidentId: string;
     status: string;
     notes?: string;
   }) => void;
-  
-  // Responder Events
+
+  /* Responder */
   'accept-incident': (data: {
     incidentId: string;
     hospitalId: string;
     responderId: string;
     eta: number;
   }) => void;
-  'update-responder-status': (data: { 
-    incidentId: string; 
+
+  'update-responder-status': (data: {
+    incidentId: string;
     status: string;
     location?: Coordinates;
   }) => void;
+
   'update-responder-location': (data: ResponderLocation) => void;
-  
-  // Emergency Events
-  'panic-button': (data: { 
-    driverId: string; 
+
+  /* Emergency */
+  'panic-button': (data: {
+    driverId: string;
     location: Coordinates;
     timestamp: Date;
   }) => void;
+
   'cancel-emergency': (incidentId: string) => void;
-  
-  // Connection Events
+
+  /* Connection */
   'driver-connect': (driverId: string) => void;
   'hospital-connect': (hospitalId: string) => void;
   'responder-connect': (responderId: string) => void;
   'disconnect': () => void;
 }
+
+/* ================= SOCKET STATE ================= */
 
 export interface SocketState {
   connected: boolean;
@@ -126,6 +149,8 @@ export interface SocketState {
   lastPing?: Date;
   lastPong?: Date;
 }
+
+/* ================= SOCKET CONFIG ================= */
 
 export interface SocketConfig {
   url: string;

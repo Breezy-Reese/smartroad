@@ -1,5 +1,5 @@
 import { Socket } from 'socket.io-client';
-import { ServerToClientEvents, ClientToServerEvents } from '../../types/socket.types';
+import { ServerToClientEvents, ClientToServerEvents } from 'types/socket.types';
 
 export class EmergencySocket {
   constructor(private socket: Socket<ServerToClientEvents, ClientToServerEvents>) {}

@@ -1,1 +1,1 @@
-export { socketClient } from '../../config/socket.config';
+export {};

@@ -1,5 +1,5 @@
 import { Coordinates } from '../../types/location.types';
-import { IncidentSeverity } from '../../types/incident.types';
+import { IncidentSeverity } from '../../types/emergency.types';
 
 interface RiskFactors {
   timeOfDay: number;
