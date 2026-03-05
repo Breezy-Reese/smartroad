@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { ShieldExclamationIcon } from '@heroicons/react/24/outline';
+import AuthLayout from './AuthLayout';
 
 /* ================= TYPES ================= */
 
@@ -47,10 +48,7 @@ const Register: React.FC = () => {
 
     setFormData(prev => ({
       ...prev,
-      [name]:
-        name === 'role'
-          ? (value as UserRole)
-          : value,
+      [name]: name === 'role' ? (value as UserRole) : value,
     }));
   };
 
@@ -68,12 +66,10 @@ const Register: React.FC = () => {
     setLoading(true);
 
     try {
-      // Remove confirmPassword before sending
       const { confirmPassword, ...payload } = formData;
 
       await register(payload);
 
-      // Optional redirect after success
       navigate('/dashboard');
     } catch (err: any) {
       setError(err?.message || 'Registration failed');
@@ -85,32 +81,21 @@ const Register: React.FC = () => {
   /* ================= UI ================= */
 
   return (
-    <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8">
-      <div className="text-center mb-8">
-        <div className="flex justify-center mb-4">
-          <div className="bg-emergency-600 p-3 rounded-full">
-            <ShieldExclamationIcon className="h-12 w-12 text-white" />
-          </div>
-        </div>
+    <AuthLayout
+      title="Create Account"
+      subtitle="Join the emergency response network"
+    >
 
-        <h2 className="text-3xl font-bold text-gray-900">
-          Create Account
-        </h2>
-
-        <p className="text-sm text-gray-600 mt-2">
-          Join the emergency response network
-        </p>
-      </div>
-
+      {/* ===== ERROR ===== */}
       {error && (
-        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-xl text-sm">
           {error}
         </div>
       )}
 
+      {/* ===== FORM ===== */}
       <form onSubmit={handleSubmit} className="space-y-4">
 
-        {/* NAME */}
         <InputField
           label="Full Name"
           name="name"
@@ -119,7 +104,6 @@ const Register: React.FC = () => {
           onChange={handleChange}
         />
 
-        {/* EMAIL */}
         <InputField
           label="Email Address"
           name="email"
@@ -128,7 +112,6 @@ const Register: React.FC = () => {
           onChange={handleChange}
         />
 
-        {/* PHONE */}
         <InputField
           label="Phone Number"
           name="phone"
@@ -137,7 +120,7 @@ const Register: React.FC = () => {
           onChange={handleChange}
         />
 
-        {/* ROLE */}
+        {/* ROLE SELECT */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Role
@@ -147,14 +130,15 @@ const Register: React.FC = () => {
             name="role"
             value={formData.role}
             onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emergency-500"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl 
+            focus:ring-2 focus:ring-emergency-500 outline-none"
           >
             <option value="driver">Driver</option>
             <option value="hospital">Hospital</option>
           </select>
         </div>
 
-        {/* DRIVER FIELD */}
+        {/* CONDITIONAL FIELDS */}
         {formData.role === 'driver' && (
           <InputField
             label="Driver License Number"
@@ -165,7 +149,6 @@ const Register: React.FC = () => {
           />
         )}
 
-        {/* HOSPITAL FIELD */}
         {formData.role === 'hospital' && (
           <InputField
             label="Hospital Name"
@@ -176,7 +159,6 @@ const Register: React.FC = () => {
           />
         )}
 
-        {/* PASSWORD */}
         <InputField
           label="Password"
           name="password"
@@ -185,7 +167,6 @@ const Register: React.FC = () => {
           onChange={handleChange}
         />
 
-        {/* CONFIRM PASSWORD */}
         <InputField
           label="Confirm Password"
           name="confirmPassword"
@@ -194,15 +175,21 @@ const Register: React.FC = () => {
           onChange={handleChange}
         />
 
+        {/* SUBMIT BUTTON */}
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-emergency-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-emergency-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emergency-500 disabled:opacity-50 transition-colors"
+          className="w-full bg-emergency-600 text-white py-3 px-4 rounded-xl
+          font-medium hover:bg-emergency-700 transition
+          disabled:opacity-50 disabled:cursor-not-allowed
+          focus:outline-none focus:ring-4 focus:ring-emergency-300"
         >
           {loading ? 'Creating Account...' : 'Create Account'}
         </button>
+
       </form>
 
+      {/* LOGIN LINK */}
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
           Already have an account?{' '}
@@ -214,11 +201,12 @@ const Register: React.FC = () => {
           </Link>
         </p>
       </div>
-    </div>
+
+    </AuthLayout>
   );
 };
 
-/* ================= REUSABLE INPUT COMPONENT ================= */
+/* ================= REUSABLE INPUT ================= */
 
 interface InputProps {
   label: string;
@@ -246,7 +234,8 @@ const InputField: React.FC<InputProps> = ({
       required
       value={value}
       onChange={onChange}
-      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emergency-500"
+      className="w-full px-4 py-3 border border-gray-300 rounded-xl
+      focus:ring-2 focus:ring-emergency-500 outline-none transition"
     />
   </div>
 );
