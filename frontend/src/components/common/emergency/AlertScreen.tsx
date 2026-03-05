@@ -147,9 +147,9 @@ const AlertScreen: React.FC = () => {
 
             {incident.location && (
               <p className="text-sm font-mono">
-                {incident.location.lat.toFixed(6)}
+                {(incident.location.lat ?? incident.location.latitude).toFixed(6)}
                 <br />
-                {incident.location.lng.toFixed(6)}
+                {(incident.location.lng ?? incident.location.longitude).toFixed(6)}
               </p>
             )}
           </div>

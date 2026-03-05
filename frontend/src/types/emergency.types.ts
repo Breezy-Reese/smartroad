@@ -1,4 +1,3 @@
-
 // src/types/emergency.types.ts
 
 // ----------------------
@@ -13,18 +12,20 @@ export type IncidentSeverity =
   | "fatal";
 
 export type IncidentType =
-  | "accident"
+  | "collision"
+  | "rollover"
   | "fire"
   | "medical"
-  | "crime"
   | "other";
 
 export type IncidentStatus =
+  | "pending"
   | "reported"
   | "assigned"
   | "responding"
   | "resolved"
-  | "closed";
+  | "closed"
+  | "cancelled";
 
 export type ResponderStatus =
   | "online"
@@ -37,47 +38,55 @@ export type ResponderStatus =
 // ----------------------
 
 export interface Location {
-  lng: any;
-  lat: any;
   latitude: number;
   longitude: number;
-}
 
+  // compatibility with map libraries
+  lat?: number;
+  lng?: number;
+}
 export interface ResponderInfo {
-  eta: number;
   id: string;
   name: string;
-  role: string; // driver | hospital | police etc
+  role: string; // driver | hospital | police
   status: ResponderStatus;
+  eta: number;
   location?: Location;
   phone?: string;
 }
 
 export interface EmergencyAlert {
-  timestamp: string | number | Date;
-  driverName: any;
   id: string;
   message: string;
-  createdAt: string;
   severity: IncidentSeverity;
+  timestamp: string | number | Date;
+  createdAt: string;
+  driverName?: string;
 }
 
 export interface Incident {
-  driver: any;
-  _id(_id: any): void;
-  speed: number;
-  timestamp(timestamp: any): import("react").ReactNode;
-  vehicleNumber: string;
-  locationAddress: any;
-  incidentId: string;
-  driverId: string | undefined;
-  id: string;
+  _id: string;
+  id?: string;
+
   title: string;
   description: string;
+
   type: IncidentType;
   severity: IncidentSeverity;
   status: IncidentStatus;
+
   location: Location;
+  locationAddress?: string;
+
+  speed?: number;
+  vehicleNumber?: string;
+
+  driverId?: string;
+  driver?: any;
+
+  timestamp: string | number | Date;
+
+  incidentId?: string;
 
   createdAt: string;
   updatedAt?: string;
@@ -98,6 +107,7 @@ export interface CreateIncidentDto {
   type: IncidentType;
   severity: IncidentSeverity;
   location: Location;
+  driverId?: string;
 }
 
 export interface UpdateIncidentDto {
@@ -106,4 +116,9 @@ export interface UpdateIncidentDto {
   severity?: IncidentSeverity;
   status?: IncidentStatus;
   location?: Location;
+}
+export interface IncidentReport {
+  incidentId: string;
+  message: string;
+  createdAt?: string;
 }

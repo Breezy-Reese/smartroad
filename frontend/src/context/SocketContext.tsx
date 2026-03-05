@@ -105,7 +105,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     handler: ServerToClientEvents[K]
   ) => {
     if (socket) {
-      socket.on(event, handler);
+      socket.on(event as any, handler as any);
     }
   };
 
@@ -115,7 +115,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   ) => {
     if (socket) {
       if (handler) {
-        socket.off(event, handler);
+        socket.off(event as any, handler as any);
       } else {
         socket.off(event);
       }

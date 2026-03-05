@@ -136,7 +136,7 @@ const IncidentCard: React.FC<IncidentCardProps> = ({
           <div className="flex items-center space-x-2 text-gray-600">
             <ClockIcon className="h-4 w-4" />
             <span className="text-sm">
-              {formatTime(incident.timestamp)}
+              {formatTime(new Date(incident.timestamp))}
             </span>
           </div>
 

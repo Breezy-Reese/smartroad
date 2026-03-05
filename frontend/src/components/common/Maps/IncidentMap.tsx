@@ -7,7 +7,7 @@ import {
   Circle,
 } from '@react-google-maps/api';
 
-import { Incident } from 'types/incident.types';
+import { Incident } from '../../../types/emergency.types';
 import { Coordinates } from '../../../types/location.types';
 
 interface IncidentMapProps {
@@ -136,7 +136,10 @@ const IncidentMap: React.FC<IncidentMapProps> = ({
         {/* ------------------- Info Window ------------------- */}
         {selected && selected.location && (
           <InfoWindow
-            position={selected.location}
+            position={{
+  lat: selected.location.latitude ?? selected.location.lat ?? 0,
+  lng: selected.location.longitude ?? selected.location.lng ?? 0,
+}}
             onCloseClick={() => setSelected(null)}
           >
             <div className="p-2 max-w-xs">

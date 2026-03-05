@@ -57,7 +57,7 @@ const IncidentList: React.FC = () => {
       const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(inc =>
         (inc.incidentId ?? '').toLowerCase().includes(searchLower) ||
-        inc.driverId?.name?.toLowerCase().includes(searchLower) ||
+        inc.driverId?.toLowerCase().includes(searchLower) ||
         inc.vehicleNumber?.toLowerCase().includes(searchLower)
       );
     }
@@ -235,7 +235,7 @@ const IncidentList: React.FC = () => {
                     {format(new Date(incident.timestamp ?? new Date()), 'HH:mm, MMM dd')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {incident.location.lat.toFixed(4)}, {incident.location.lng.toFixed(4)}
+                    {(incident.location.lat ?? incident.location.latitude).toFixed(6)}, {(incident.location.lng ?? incident.location.longitude).toFixed(6)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSeverityColor(incident.severity)}`}>

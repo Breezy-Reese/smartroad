@@ -65,7 +65,12 @@ const HospitalDashboard: React.FC = () => {
   const fetchStats = async () => {
     try {
       const data = await emergencyService.getIncidentStats();
-      setStats(prev => ({ ...prev, ...data }));
+      if (data && typeof data === "object") {
+  setStats(prev => ({
+  ...prev,
+  ...(typeof data === "object" ? data : {})
+}));
+}
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }

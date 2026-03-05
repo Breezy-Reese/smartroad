@@ -1,6 +1,5 @@
 import { Coordinates } from './location.types';
-import { Incident } from './incident.types';
-
+import { Incident } from './emergency.types';
 export interface HospitalDashboardStats {
   totalIncidents: number;
   activeIncidents: number;

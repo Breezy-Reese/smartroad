@@ -184,14 +184,17 @@ const triggerEmergency = async (type: string = 'collision') => {
     if (!currentLocation) {
       throw new Error('Location unavailable');
     }
-
-    const payload: CreateIncidentDto = {
-      driverId: user._id,
-      type: type as any,
-      severity: 'high',
-      location: currentLocation,
-      description: 'Auto detected emergency',
-    };
+const payload: CreateIncidentDto = {
+  title: "Emergency Alert",
+  driverId: user._id,
+  type: type as any,
+  severity: 'high',
+  location: {
+    latitude: currentLocation.lat,
+    longitude: currentLocation.lng,
+  },
+  description: 'Auto detected emergency',
+};
 
     const incident = await emergencyService.createEmergency(payload);
 
