@@ -1,0 +1,78 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Build files
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.*~
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Testing
+coverage/
+.nyc_output/
+
+# Production
+build/
+dist/
+
+# Temporary files
+tmp/
+temp/
+
+# Uploads
+uploads/
+public/uploads/
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.csr
+
+# Docker
+docker-compose.override.yml
+.docker/
+node_modules/
