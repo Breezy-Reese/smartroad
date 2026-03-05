@@ -6,7 +6,7 @@ import AuthLayout from './AuthLayout';
 
 /* ================= TYPES ================= */
 
-type UserRole = 'driver' | 'hospital';
+type UserRole = 'driver' | 'hospital' | 'admin';
 
 interface RegisterForm {
   name: string;
@@ -135,6 +135,7 @@ const Register: React.FC = () => {
           >
             <option value="driver">Driver</option>
             <option value="hospital">Hospital</option>
+            <option value="admin">Admin</option>
           </select>
         </div>
 
