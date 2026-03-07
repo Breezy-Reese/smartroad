@@ -45,7 +45,7 @@ export const authenticate = async (
 
       // Cache user data
       user = JSON.stringify(dbUser);
-      await redisClient.setex(`user:${decoded.userId}`, 3600, user);
+      await redisClient.setEx(key, 3600, value);
     }
 
     req.user = JSON.parse(user);
@@ -84,7 +84,7 @@ export const authorize = (...roles: string[]) => {
 
 export const optionalAuth = async (
   req: AuthRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) => {
   try {
@@ -223,7 +223,7 @@ export const checkOwnership = (paramName: string = 'userId') => {
   };
 };
 
-export const logout = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const logout = async (req: AuthRequest, _res: Response, next: NextFunction) => {
   try {
     const token = req.token;
     
@@ -233,7 +233,7 @@ export const logout = async (req: AuthRequest, res: Response, next: NextFunction
       const expiresIn = decoded.exp - Math.floor(Date.now() / 1000);
       
       if (expiresIn > 0) {
-        await redisClient.setex(`blacklist:${token}`, expiresIn, 'true');
+        await redisClient.setEx(`blacklist:${token}`, expiresIn, 'true');
       }
     }
 

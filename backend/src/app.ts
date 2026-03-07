@@ -4,7 +4,6 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
-import { rateLimit } from 'express-rate-limit';
 import { stream } from './utils/logger';
 import { errorHandler, notFound } from './middleware/error.middleware';
 import { requestLogger, requestDetails } from './middleware/logging.middleware';
@@ -53,7 +52,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/api', apiLimiter);
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.status(200).json({
     success: true,
     message: 'Server is healthy',

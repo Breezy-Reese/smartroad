@@ -8,10 +8,12 @@ interface Props {
 
 const AuthLayout: React.FC<Props> = ({ title, subtitle, children }) => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-12">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl p-16">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-10">
+      
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl p-10 max-h-[90vh] overflow-y-auto">
 
-        <div className="text-center mb-8">
+        {/* HEADER */}
+        <div className="text-center mb-6">
           <h2 className="text-3xl font-bold text-gray-900">
             {title}
           </h2>
@@ -21,9 +23,11 @@ const AuthLayout: React.FC<Props> = ({ title, subtitle, children }) => {
           </p>
         </div>
 
+        {/* CONTENT */}
         {children}
 
       </div>
+
     </div>
   );
 };

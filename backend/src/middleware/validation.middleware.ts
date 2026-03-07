@@ -99,7 +99,7 @@ export const validatePassword = (password: string): {
   };
 };
 
-export const sanitizeInput = (req: Request, res: Response, next: NextFunction) => {
+export const sanitizeInput = (req: Request, _res: Response, next: NextFunction) => {
   // Remove any potentially dangerous characters
   if (req.body) {
     Object.keys(req.body).forEach(key => {

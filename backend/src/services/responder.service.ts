@@ -116,7 +116,7 @@ class ResponderService {
           
           // Update responder's ETA in incident
           const responderIndex = incident.responders.findIndex(
-            r => r.id === responderId
+            (            r: { id: string; }) => r.id === responderId
           );
           if (responderIndex !== -1) {
             incident.responders[responderIndex].eta = eta;
@@ -255,7 +255,7 @@ class ResponderService {
       }
 
       const responderIndex = incident.responders.findIndex(
-        r => r.id === responderId
+        (        r: { id: string; }) => r.id === responderId
       );
 
       if (responderIndex !== -1) {

@@ -14,11 +14,14 @@
     "db:drop": "ts-node src/utils/dropDatabase.ts"
   },
   "dependencies": {
+    "@types/rate-limit-redis": "^1.7.4",
     "bcryptjs": "^2.4.3",
+    "compression": "^1.8.1",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "express-rate-limit": "^7.1.5",
+    "express-rate-limit": "^7.5.1",
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
@@ -26,6 +29,7 @@
     "morgan": "^1.10.0",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.7",
+    "rate-limit-redis": "^4.3.1",
     "redis": "^4.6.11",
     "socket.io": "^4.5.4",
     "twilio": "^4.19.3",
@@ -33,6 +37,8 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/compression": "^1.8.1",
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.5",

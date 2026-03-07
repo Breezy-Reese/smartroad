@@ -20,7 +20,7 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
   next();
 };
 
-export const requestDetails = (req: Request, res: Response, next: NextFunction) => {
+export const requestDetails = (req: Request, _res: Response, next: NextFunction) => {
   logger.debug('Request details:', {
     method: req.method,
     url: req.originalUrl,

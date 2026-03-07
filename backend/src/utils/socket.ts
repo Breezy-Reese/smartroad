@@ -5,7 +5,7 @@ import { appConfig } from '../config/app.config';
 import { logger } from './logger';
 import { redisClient } from '../config/redis.config';
 
-let io: SocketServer;
+export let io: SocketServer;
 
 export const initializeSocket = (server: HttpServer) => {
   io = new SocketServer(server, {

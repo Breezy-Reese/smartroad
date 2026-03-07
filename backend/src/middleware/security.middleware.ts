@@ -1,6 +1,7 @@
 import helmet from 'helmet';
 import cors from 'cors';
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../utils/logger';
 
 // Helmet configuration for security headers
 export const securityHeaders = helmet({
@@ -32,7 +33,7 @@ export const corsOptions = {
 export const corsMiddleware = cors(corsOptions);
 
 // Prevent parameter pollution
-export const sanitizeParams = (req: Request, res: Response, next: NextFunction) => {
+export const sanitizeParams = (req: Request, _res: Response, next: NextFunction) => {
   // Remove duplicate query parameters
   if (req.query) {
     Object.keys(req.query).forEach(key => {
@@ -45,7 +46,7 @@ export const sanitizeParams = (req: Request, res: Response, next: NextFunction) 
 };
 
 // XSS Protection
-export const xssProtection = (req: Request, res: Response, next: NextFunction) => {
+export const xssProtection = (_req: Request, res: Response, next: NextFunction) => {
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -53,7 +54,7 @@ export const xssProtection = (req: Request, res: Response, next: NextFunction) =
 };
 
 // Check for required environment variables
-export const checkEnv = (req: Request, res: Response, next: NextFunction) => {
+export const checkEnv = (_req: Request, res: Response, next: NextFunction) => {
   const requiredEnvVars = [
     'JWT_SECRET',
     'JWT_REFRESH_SECRET',

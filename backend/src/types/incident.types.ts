@@ -17,7 +17,7 @@ export type IncidentStatus =
 export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical' | 'fatal';
 export type IncidentType = 'collision' | 'rollover' | 'fire' | 'medical' | 'other';
 
-export interface IIncident extends Document {
+export interface Incident extends Document {
   _id: string;
   incidentId: string;
   driverId: string;

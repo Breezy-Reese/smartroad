@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { ILocation } from '../types/location.types';
+import { IUser } from '../types';
 
-export interface ILocationDocument extends ILocation, Document {}
+export interface IUserDocument extends Document, IUser {}
 
 const LocationSchema = new Schema<ILocationDocument>(
   {

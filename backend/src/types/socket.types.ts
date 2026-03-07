@@ -1,4 +1,4 @@
-import { IIncident } from './incident.types';
+import { Incident } from './incident.types';
 import { ILocationUpdate } from './location.types';
 
 export interface ServerToClientEvents {
@@ -11,8 +11,8 @@ export interface ServerToClientEvents {
   }) => void;
   
   // Incident Events
-  'new-incident': (incident: IIncident) => void;
-  'incident-update': (incident: IIncident) => void;
+  'new-incident': (incident: Incident) => void;
+  'incident-update': (incident: Incident) => void;
   'incident-resolved': (incidentId: string) => void;
   'incident-cancelled': (incidentId: string) => void;
   
@@ -72,7 +72,7 @@ export interface ClientToServerEvents {
   'stop-tracking': (driverId: string) => void;
   
   // Incident Events
-  'report-incident': (data: Partial<IIncident>) => void;
+  'report-incident': (data: Partial<Incident>) => void;
   'confirm-incident': (incidentId: string) => void;
   'update-incident-status': (data: { 
     incidentId: string; 

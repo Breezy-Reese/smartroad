@@ -178,8 +178,8 @@ class LocationService {
 
   // Find nearby hospitals (simulated - would use database query with geospatial index)
   async findNearbyHospitals(
-    location: ICoordinates,
-    radiusKm: number = 10
+    _location: ICoordinates,
+    _radiusKm: number = 10
   ): Promise<any[]> {
     // This would be implemented with actual database query
     // For now, return empty array
@@ -188,8 +188,8 @@ class LocationService {
 
   // Find nearby responders (simulated - would use database query with geospatial index)
   async findNearbyResponders(
-    location: ICoordinates,
-    radiusKm: number = 5
+    _location: ICoordinates,
+    _radiusKm: number = 5
   ): Promise<any[]> {
     // This would be implemented with actual database query
     // For now, return empty array

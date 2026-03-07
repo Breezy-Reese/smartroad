@@ -1,4 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { IUser } from '../types/user.types';
+export interface IUserDocument extends Document, IUser {}
 
 export interface IHospitalStats extends Document {
   hospitalId: string;

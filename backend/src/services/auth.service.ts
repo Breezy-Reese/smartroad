@@ -1,5 +1,4 @@
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
 import { User } from '../models/User.model';
 import { appConfig } from '../config/app.config';
 import { IAuthTokens, ILoginRequest, IRegisterRequest, IUserDocument } from '../types/user.types';
@@ -230,7 +229,7 @@ class AuthService {
       user.password = newPassword;
       user.passwordResetToken = undefined;
       user.passwordResetExpires = undefined;
-      user.refreshToken = null; // Invalidate all sessions
+     user.refreshToken = undefined; // Invalidate all sessions
       await user.save();
 
       // Clear cache
@@ -265,7 +264,7 @@ class AuthService {
 
       // Update password
       user.password = newPassword;
-      user.refreshToken = null; // Invalidate all sessions
+      user.refreshToken = undefined; // Invalidate all sessions
       await user.save();
 
       // Clear cache
@@ -310,8 +309,8 @@ class AuthService {
   async cacheUserData(user: IUserDocument): Promise<void> {
     try {
       const userData = user.toJSON();
-      await redisClient.setex(`user:${user._id}`, 3600, JSON.stringify(userData)); // 1 hour cache
-      await redisClient.setex(`user:${user._id}:profile`, 300, JSON.stringify(userData)); // 5 min cache for profile
+      await redisClient.setEx(`user:${user._id}`, 3600, JSON.stringify(userData)); // 1 hour cache
+      await redisClient.setEx(`user:${user._id}:profile`, 300, JSON.stringify(userData)); // 5 min cache for profile
     } catch (error) {
       logger.error('Error caching user data:', error);
     }
@@ -401,30 +400,28 @@ class AuthService {
   private generateTokens(
     userId: string,
     role: string,
-    expiresIn: string = this.TOKEN_EXPIRY.access
+    _expiresIn: string = this.TOKEN_EXPIRY.access
   ): IAuthTokens {
-    const accessToken = jwt.sign(
-      { userId, role },
-      appConfig.jwt.secret,
-      { expiresIn }
-    );
+   const payload = {
+  userId,
+  role,
+};
 
-    const refreshToken = jwt.sign(
-      { userId },
-      appConfig.jwt.refreshSecret,
-      { expiresIn: this.TOKEN_EXPIRY.refresh }
-    );
+
+    const refreshToken = jwt.sign(payload, process.env.JWT_SECRET!, {
+  expiresIn: appConfig.jwt.expiresIn,
+})
 
     return { accessToken, refreshToken };
   }
 
-  async verifyMFA(userId: string, code: string): Promise<boolean> {
+  async verifyMFA(_userId: string, _code: string): Promise<boolean> {
     // Implement MFA verification if needed
     // This is a placeholder for future implementation
     return true;
   }
 
-  async generateMFACode(userId: string): Promise<string> {
+  async generateMFACode(_userId: string): Promise<string> {
     // Implement MFA code generation if needed
     // This is a placeholder for future implementation
     return '123456';

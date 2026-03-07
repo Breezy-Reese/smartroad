@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
-import { ShieldExclamationIcon } from '@heroicons/react/24/outline';
 import AuthLayout from './AuthLayout';
-
-/* ================= TYPES ================= */
 
 type UserRole = 'driver' | 'hospital' | 'admin';
 
@@ -18,8 +15,6 @@ interface RegisterForm {
   licenseNumber: string;
   hospitalName: string;
 }
-
-/* ======================================== */
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -39,20 +34,15 @@ const Register: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  /* ================= HANDLE CHANGE ================= */
-
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: name === 'role' ? (value as UserRole) : value,
     }));
   };
-
-  /* ================= SUBMIT ================= */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,9 +57,7 @@ const Register: React.FC = () => {
 
     try {
       const { confirmPassword, ...payload } = formData;
-
       await register(payload);
-
       navigate('/dashboard');
     } catch (err: any) {
       setError(err?.message || 'Registration failed');
@@ -78,22 +66,24 @@ const Register: React.FC = () => {
     }
   };
 
-  /* ================= UI ================= */
-
   return (
-    <AuthLayout
-      title="Create Account"
-      subtitle="Join the emergency response network"
-    >
+    <AuthLayout title={''} subtitle={''} children={undefined}>
+      {/* HEADER */}
+      <div className="text-center mb-6">
+        <h2 className="text-3xl font-bold text-gray-900">Create Account</h2>
+        <p className="text-sm text-gray-600 mt-1">
+          Join the emergency response network
+        </p>
+      </div>
 
-      {/* ===== ERROR ===== */}
+      {/* ERROR */}
       {error && (
-        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-xl text-sm">
+        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
           {error}
         </div>
       )}
 
-      {/* ===== FORM ===== */}
+      {/* FORM */}
       <form onSubmit={handleSubmit} className="space-y-4">
 
         <InputField
@@ -125,13 +115,12 @@ const Register: React.FC = () => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Role
           </label>
-
           <select
             name="role"
             value={formData.role}
             onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl 
-            focus:ring-2 focus:ring-emergency-500 outline-none"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg
+            focus:ring-2 focus:ring-red-500 outline-none"
           >
             <option value="driver">Driver</option>
             <option value="hospital">Hospital</option>
@@ -139,7 +128,7 @@ const Register: React.FC = () => {
           </select>
         </div>
 
-        {/* CONDITIONAL FIELDS */}
+        {/* DRIVER FIELD */}
         {formData.role === 'driver' && (
           <InputField
             label="Driver License Number"
@@ -150,6 +139,7 @@ const Register: React.FC = () => {
           />
         )}
 
+        {/* HOSPITAL FIELD */}
         {formData.role === 'hospital' && (
           <InputField
             label="Hospital Name"
@@ -180,10 +170,9 @@ const Register: React.FC = () => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-emergency-600 text-white py-3 px-4 rounded-xl
-          font-medium hover:bg-emergency-700 transition
-          disabled:opacity-50 disabled:cursor-not-allowed
-          focus:outline-none focus:ring-4 focus:ring-emergency-300"
+          className="w-full bg-red-600 text-white py-3 rounded-lg
+          hover:bg-red-700 transition font-medium
+          disabled:opacity-50"
         >
           {loading ? 'Creating Account...' : 'Create Account'}
         </button>
@@ -193,22 +182,20 @@ const Register: React.FC = () => {
       {/* LOGIN LINK */}
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
-          Already have an account?{' '}
+          Already have an account?{" "}
           <Link
             to="/login"
-            className="font-medium text-emergency-600 hover:text-emergency-500"
+            className="text-red-600 hover:text-red-500 font-medium"
           >
             Sign in
           </Link>
         </p>
       </div>
-
     </AuthLayout>
   );
 };
 
-/* ================= REUSABLE INPUT ================= */
-
+/* INPUT COMPONENT */
 interface InputProps {
   label: string;
   name: string;
@@ -217,26 +204,19 @@ interface InputProps {
   onChange: React.ChangeEventHandler<HTMLInputElement>;
 }
 
-const InputField: React.FC<InputProps> = ({
-  label,
-  name,
-  type,
-  value,
-  onChange,
-}) => (
+const InputField: React.FC<InputProps> = ({ label, name, type, value, onChange }) => (
   <div>
     <label className="block text-sm font-medium text-gray-700 mb-2">
       {label}
     </label>
-
     <input
       type={type}
       name={name}
       required
       value={value}
       onChange={onChange}
-      className="w-full px-4 py-3 border border-gray-300 rounded-xl
-      focus:ring-2 focus:ring-emergency-500 outline-none transition"
+      className="w-full px-4 py-3 border border-gray-300 rounded-lg
+      focus:ring-2 focus:ring-red-500 outline-none"
     />
   </div>
 );

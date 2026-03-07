@@ -1,5 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { IUser } from '../types/user.types';
 
+export interface IUserDocument extends Document, IUser {}
 export interface IResponderStatus extends Document {
   responderId: string;
   isAvailable: boolean;

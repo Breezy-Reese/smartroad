@@ -1,204 +1,133 @@
-import mongoose, { Schema, Document } from 'mongoose';
-import { 
-  IIncident, 
-  IResponderInfo, 
-  IncidentStatus, 
-  IncidentSeverity, 
-  IncidentType 
-} from '../types/incident.types';
+import mongoose, { Schema, Document } from "mongoose";
+import { Incident, IResponderInfo, IEmergencyContact } from "../types/incident.types";
+import { IUser } from "../types";
 
-export interface IIncidentDocument extends IIncident, Document {}
+export interface IUserDocument extends Document, IUser {}
 
-const ResponderInfoSchema = new Schema<IResponderInfo>({
-  id: { type: String, required: true },
-  name: { type: String, required: true },
-  type: { 
-    type: String, 
-    enum: ['ambulance', 'police', 'fire', 'rescue'],
-    required: true 
-  },
-  hospital: { type: String },
-  eta: { type: Number, required: true },
-  distance: { type: Number, required: true },
-  status: { 
-    type: String, 
-    enum: ['dispatched', 'en-route', 'arrived', 'treating', 'transporting', 'completed'],
-    default: 'dispatched'
-  },
-  location: {
-    lat: { type: Number },
-    lng: { type: Number },
-  },
-  contactNumber: { type: String },
-  dispatchedAt: { type: Date, default: Date.now },
-  arrivedAt: { type: Date },
-  completedAt: { type: Date },
-});
-
-const EmergencyContactSchema = new Schema({
-  _id: { type: String, required: true },
-  name: { type: String, required: true },
-  relationship: { type: String, required: true },
-  phone: { type: String, required: true },
-  email: { type: String },
-  isNotified: { type: Boolean, default: false },
-  notifiedAt: { type: Date },
-});
-
-const IncidentSchema = new Schema<IIncidentDocument>(
+const CoordinatesSchema = new Schema(
   {
-    incidentId: {
-      type: String,
-      required: true,
-      unique: true,
-      default: () => `INC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    },
-    driverId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    driverName: {
-      type: String,
-      required: true,
-    },
-    driverPhone: {
-      type: String,
-    },
+    lat: { type: Number, required: true },
+    lng: { type: Number, required: true }
+  },
+  { _id: false }
+);
+
+const ResponderSchema = new Schema<IResponderInfo>(
+  {
+    id: { type: String, required: true },
+    name: { type: String, required: true },
     type: {
       type: String,
-      enum: ['collision', 'rollover', 'fire', 'medical', 'other'],
-      required: true,
+      enum: ["ambulance", "police", "fire", "rescue"],
+      required: true
     },
+    hospital: { type: String },
+    eta: { type: Number, required: true },
+    distance: { type: Number, required: true },
+    status: {
+      type: String,
+      enum: ["dispatched", "en-route", "arrived", "treating", "transporting", "completed"],
+      default: "dispatched"
+    },
+    location: CoordinatesSchema,
+    contactNumber: String,
+    dispatchedAt: { type: Date, default: Date.now },
+    arrivedAt: Date,
+    completedAt: Date
+  },
+  { _id: false }
+);
+
+const EmergencyContactSchema = new Schema<IEmergencyContact>(
+  {
+    name: { type: String, required: true },
+    relationship: { type: String, required: true },
+    phone: { type: String, required: true },
+    email: String,
+    isNotified: { type: Boolean, default: false },
+    notifiedAt: Date
+  },
+  { _id: false }
+);
+
+const IncidentSchema = new Schema<IncidentDocument>(
+  {
+    incidentId: { type: String, required: true, unique: true },
+
+    driverId: { type: String, required: true },
+    driverName: { type: String, required: true },
+    driverPhone: String,
+
+    type: {
+      type: String,
+      enum: ["collision", "rollover", "fire", "medical", "other"],
+      required: true
+    },
+
     severity: {
       type: String,
-      enum: ['low', 'medium', 'high', 'critical', 'fatal'],
-      default: 'medium',
+      enum: ["low", "medium", "high", "critical", "fatal"],
+      default: "medium"
     },
+
     status: {
       type: String,
       enum: [
-        'pending', 'detected', 'confirmed', 'dispatched', 'en-route',
-        'arrived', 'treating', 'transporting', 'resolved', 'cancelled', 'false-alarm'
+        "pending",
+        "detected",
+        "confirmed",
+        "dispatched",
+        "en-route",
+        "arrived",
+        "treating",
+        "transporting",
+        "resolved",
+        "cancelled",
+        "false-alarm"
       ],
-      default: 'pending',
+      default: "pending"
     },
-    location: {
-      lat: { type: Number, required: true },
-      lng: { type: Number, required: true },
-    },
-    locationAddress: {
-      type: String,
-    },
-    timestamp: {
-      type: Date,
-      default: Date.now,
-    },
-    detectedAt: {
-      type: Date,
-      default: Date.now,
-    },
-    confirmedAt: {
-      type: Date,
-    },
-    resolvedAt: {
-      type: Date,
-    },
-    
-    // Incident Details
-    speed: {
-      type: Number,
-    },
-    impactForce: {
-      type: Number,
-    },
-    airbagDeployed: {
-      type: Boolean,
-      default: false,
-    },
-    occupants: {
-      type: Number,
-      default: 1,
-    },
-    injuries: {
-      type: Number,
-      default: 0,
-    },
-    fatalities: {
-      type: Number,
-      default: 0,
-    },
-    
-    // Vehicle Info
-    vehicleId: {
-      type: String,
-    },
-    vehicleNumber: {
-      type: String,
-    },
-    vehicleMake: {
-      type: String,
-    },
-    vehicleModel: {
-      type: String,
-    },
-    vehicleColor: {
-      type: String,
-    },
-    
-    // Media
-    images: [{
-      type: String,
-    }],
-    videos: [{
-      type: String,
-    }],
-    
-    // Response
-    responders: [ResponderInfoSchema],
+
+    location: { type: CoordinatesSchema, required: true },
+
+    locationAddress: String,
+
+    timestamp: { type: Date, default: Date.now },
+    detectedAt: { type: Date, default: Date.now },
+
+    confirmedAt: Date,
+    resolvedAt: Date,
+
+    speed: Number,
+    impactForce: Number,
+    airbagDeployed: { type: Boolean, default: false },
+    occupants: Number,
+    injuries: Number,
+    fatalities: Number,
+
+    vehicleId: String,
+    vehicleNumber: String,
+    vehicleMake: String,
+    vehicleModel: String,
+    vehicleColor: String,
+
+    images: [String],
+    videos: [String],
+
+    responders: [ResponderSchema],
     emergencyContacts: [EmergencyContactSchema],
-    hospitalId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-    },
-    assignedAmbulance: {
-      type: String,
-    },
-    assignedHospital: {
-      type: String,
-    },
-    
-    // Metadata
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-    },
-    updatedBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-    },
+
+    hospitalId: String,
+    assignedAmbulance: String,
+    assignedHospital: String,
+
+    createdBy: String,
+    updatedBy: String
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Indexes for efficient queries
-IncidentSchema.index({ incidentId: 1 });
-IncidentSchema.index({ driverId: 1 });
-IncidentSchema.index({ status: 1 });
-IncidentSchema.index({ severity: 1 });
-IncidentSchema.index({ timestamp: -1 });
-IncidentSchema.index({ 'location.lat': 1, 'location.lng': 1 });
-IncidentSchema.index({ hospitalId: 1 });
-IncidentSchema.index({ createdAt: -1 });
-
-// Pre-save middleware to generate incident ID if not provided
-IncidentSchema.pre('save', function(next) {
-  if (!this.incidentId) {
-    this.incidentId = `INC-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }
-  next();
-});
-
-export const Incident = mongoose.model<IIncidentDocument>('Incident', IncidentSchema);
+export const Incident = mongoose.model<IncidentDocument>(
+  "Incident",
+  IncidentSchema
+);

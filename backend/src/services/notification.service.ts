@@ -1,14 +1,17 @@
 import { io } from '../utils/socket';
 import { sendSMS } from './sms.service';
 import { sendEmail } from './email.service';
-import { IIncident } from '../types/incident.types';
+import { Incident } from '../types/incident.types';
 import { IEmergencyContact } from '../types/user.types';
 import { logger } from '../utils/logger';
 
 class NotificationService {
+  sendSMS(_arg0: { to: any; message: string; }) {
+    throw new Error('Method not implemented.');
+  }
   async notifyEmergencyContacts(
     contacts: IEmergencyContact[],
-    incident: IIncident
+    incident: Incident
   ): Promise<void> {
     const message = this.formatEmergencyMessage(incident);
 
@@ -74,7 +77,7 @@ class NotificationService {
 
   async notifyHospital(
     hospitalId: string,
-    incident: IIncident
+    incident: Incident
   ): Promise<void> {
     try {
       // Emit socket event
@@ -94,7 +97,7 @@ class NotificationService {
 
   async notifyResponder(
     responderId: string,
-    incident: IIncident,
+    incident: Incident,
     eta: number
   ): Promise<void> {
     try {
@@ -129,7 +132,7 @@ class NotificationService {
   }
 
   async broadcastToHospitals(
-    incident: IIncident,
+    incident: Incident,
     hospitalIds?: string[]
   ): Promise<void> {
     try {
@@ -187,7 +190,7 @@ class NotificationService {
   }
 
   async sendIncidentUpdate(
-    incident: IIncident,
+    incident: Incident,
     updateType: 'status' | 'responder' | 'location'
   ): Promise<void> {
     try {
@@ -206,7 +209,7 @@ class NotificationService {
       }
 
       // Notify responders
-      incident.responders.forEach(responder => {
+      incident.responders.forEach((responder: { id: any; }) => {
         io.to(`responder-${responder.id}`).emit('incident-update', incident);
       });
 
@@ -216,7 +219,7 @@ class NotificationService {
     }
   }
 
-  private formatEmergencyMessage(incident: IIncident): string {
+  private formatEmergencyMessage(incident: Incident): string {
     const severity = incident.severity.toUpperCase();
     const location = incident.locationAddress || 
       `Lat: ${incident.location.lat.toFixed(6)}, Lng: ${incident.location.lng.toFixed(6)}`;

@@ -5,13 +5,33 @@ import { Incident } from '../models/Incident.model';
 import { logger } from '../utils/logger';
 import { locationService } from '../services/location.service';
 
+/* ============================================================
+   UPDATE LOCATION
+============================================================ */
+
 export const updateLocation = async (req: Request, res: Response) => {
   try {
-    const { latitude, longitude, speed, accuracy, heading, altitude, altitudeAccuracy } = req.body;
+    const {
+      latitude,
+      longitude,
+      speed = 0,
+      accuracy,
+      heading,
+      altitude,
+      altitudeAccuracy,
+    } = req.body;
+
     const driverId = req.user?._id;
 
-    // Get driver details
+    if (!driverId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized',
+      });
+    }
+
     const driver = await User.findById(driverId);
+
     if (!driver) {
       return res.status(404).json({
         success: false,
@@ -19,7 +39,6 @@ export const updateLocation = async (req: Request, res: Response) => {
       });
     }
 
-    // Create location record
     const location = new Location({
       driverId,
       driverName: driver.name,
@@ -27,7 +46,7 @@ export const updateLocation = async (req: Request, res: Response) => {
       vehicleNumber: driver.vehicleNumber,
       latitude,
       longitude,
-      speed: speed || 0,
+      speed,
       accuracy,
       heading,
       altitude,
@@ -38,28 +57,41 @@ export const updateLocation = async (req: Request, res: Response) => {
 
     await location.save();
 
-    // Check if driver has active incident
     const activeIncident = await Incident.findOne({
       driverId,
-      status: { $in: ['pending', 'detected', 'confirmed', 'dispatched', 'en-route'] },
+      status: {
+        $in: [
+          'pending',
+          'detected',
+          'confirmed',
+          'dispatched',
+          'en-route',
+        ],
+      },
     });
 
+    const io = req.app.get('io');
+
     if (activeIncident) {
-      // Update incident with latest location
-      activeIncident.location = { lat: latitude, lng: longitude };
+      activeIncident.location = {
+        lat: latitude,
+        lng: longitude,
+      };
+
       await activeIncident.save();
 
-      // Update responder ETA if any
-      if (activeIncident.responders && activeIncident.responders.length > 0) {
-        const io = req.app.get('io');
-        activeIncident.responders.forEach(responder => {
-          if (responder.status === 'en-route' && responder.location) {
+      if (activeIncident.responders?.length) {
+        activeIncident.responders.forEach((r: any) => {
+          if (r?.status === 'en-route' && r?.location) {
             const eta = locationService.calculateETA(
               { lat: latitude, lng: longitude },
-              { lat: responder.location.lat, lng: responder.location.lng }
+              {
+                lat: r.location.lat,
+                lng: r.location.lng,
+              }
             );
-            
-            io.to(`responder-${responder.id}`).emit('driver-location-update', {
+
+            io?.to(`responder-${r.id}`).emit('driver-location-update', {
               incidentId: activeIncident._id,
               location: { lat: latitude, lng: longitude },
               eta,
@@ -69,9 +101,7 @@ export const updateLocation = async (req: Request, res: Response) => {
       }
     }
 
-    // Emit location update via socket
-    const io = req.app.get('io');
-    io.emit('location-update', {
+    io?.emit('location-update', {
       driverId,
       driverName: driver.name,
       latitude,
@@ -81,45 +111,56 @@ export const updateLocation = async (req: Request, res: Response) => {
       status: location.status,
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: location,
     });
   } catch (error) {
-    logger.error('Update location error:', error);
-    res.status(500).json({
+    logger.error('Update location error', error);
+
+    return res.status(500).json({
       success: false,
       error: 'Failed to update location',
     });
   }
 };
 
+/* ============================================================
+   GET DRIVER LOCATION
+============================================================ */
+
 export const getDriverLocation = async (req: Request, res: Response) => {
   try {
     const { driverId } = req.params;
 
-    const location = await Location.findOne({ driverId })
-      .sort({ timestamp: -1 });
+    const location = await Location.findOne({ driverId }).sort({
+      timestamp: -1,
+    });
 
     if (!location) {
       return res.status(404).json({
         success: false,
-        error: 'No location found for driver',
+        error: 'No location found',
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: location,
     });
   } catch (error) {
-    logger.error('Get driver location error:', error);
-    res.status(500).json({
+    logger.error('Get driver location error', error);
+
+    return res.status(500).json({
       success: false,
       error: 'Failed to get driver location',
     });
   }
 };
+
+/* ============================================================
+   GET DRIVER HISTORY
+============================================================ */
 
 export const getDriverHistory = async (req: Request, res: Response) => {
   try {
@@ -130,63 +171,57 @@ export const getDriverHistory = async (req: Request, res: Response) => {
 
     if (startDate || endDate) {
       query.timestamp = {};
-      if (startDate) query.timestamp.$gte = new Date(startDate as string);
-      if (endDate) query.timestamp.$lte = new Date(endDate as string);
+      if (startDate)
+        query.timestamp.$gte = new Date(startDate as string);
+      if (endDate)
+        query.timestamp.$lte = new Date(endDate as string);
     }
 
     const locations = await Location.find(query)
       .sort({ timestamp: -1 })
-      .limit(parseInt(limit as string));
+      .limit(Number(limit));
 
-    res.json({
+    return res.json({
       success: true,
       data: locations,
     });
   } catch (error) {
-    logger.error('Get driver history error:', error);
-    res.status(500).json({
+    logger.error('Get driver history error', error);
+
+    return res.status(500).json({
       success: false,
-      error: 'Failed to get driver history',
+      error: 'Failed to fetch history',
     });
   }
 };
 
+/* ============================================================
+   GET NEARBY DRIVERS
+============================================================ */
+
 export const getNearbyDrivers = async (req: Request, res: Response) => {
   try {
-    const { lat, lng, radius = 5 } = req.query;
+    const { lat, lng } = req.query;
 
     if (!lat || !lng) {
       return res.status(400).json({
         success: false,
-        error: 'Latitude and longitude are required',
+        error: 'Latitude and longitude required',
       });
     }
 
-    // Get drivers with recent location updates
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
-    const nearbyDrivers = await Location.aggregate([
+    const drivers = await Location.aggregate([
       {
         $match: {
           timestamp: { $gte: fiveMinutesAgo },
         },
       },
       {
-        $geoNear: {
-          near: {
-            type: 'Point',
-            coordinates: [parseFloat(lng as string), parseFloat(lat as string)],
-          },
-          distanceField: 'distance',
-          maxDistance: parseInt(radius as string) * 1000,
-          spherical: true,
-        },
-      },
-      {
         $group: {
           _id: '$driverId',
           latestLocation: { $first: '$$ROOT' },
-          distance: { $first: '$distance' },
         },
       },
       {
@@ -197,12 +232,9 @@ export const getNearbyDrivers = async (req: Request, res: Response) => {
           as: 'driver',
         },
       },
-      {
-        $unwind: '$driver',
-      },
+      { $unwind: '$driver' },
       {
         $project: {
-          _id: 0,
           driverId: '$_id',
           driverName: '$driver.name',
           driverPhone: '$driver.phone',
@@ -213,29 +245,31 @@ export const getNearbyDrivers = async (req: Request, res: Response) => {
           },
           speed: '$latestLocation.speed',
           status: '$latestLocation.status',
-          distance: { $round: ['$distance', 2] },
           lastUpdate: '$latestLocation.timestamp',
         },
       },
-      {
-        $sort: { distance: 1 },
-      },
+      { $sort: { lastUpdate: -1 } },
     ]);
 
-    res.json({
+    return res.json({
       success: true,
-      data: nearbyDrivers,
+      data: drivers,
     });
   } catch (error) {
-    logger.error('Get nearby drivers error:', error);
-    res.status(500).json({
+    logger.error('Get nearby drivers error', error);
+
+    return res.status(500).json({
       success: false,
       error: 'Failed to get nearby drivers',
     });
   }
 };
 
-export const getActiveDrivers = async (req: Request, res: Response) => {
+/* ============================================================
+   GET ACTIVE DRIVERS
+============================================================ */
+
+export const getActiveDrivers = async (_req: Request, res: Response) => {
   try {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
@@ -259,12 +293,9 @@ export const getActiveDrivers = async (req: Request, res: Response) => {
           as: 'driver',
         },
       },
-      {
-        $unwind: '$driver',
-      },
+      { $unwind: '$driver' },
       {
         $project: {
-          _id: 0,
           driverId: '$_id',
           driverName: '$driver.name',
           driverPhone: '$driver.phone',
@@ -278,29 +309,29 @@ export const getActiveDrivers = async (req: Request, res: Response) => {
           lastUpdate: '$latestLocation.timestamp',
         },
       },
-      {
-        $sort: { lastUpdate: -1 },
-      },
+      { $sort: { lastUpdate: -1 } },
     ]);
 
-    res.json({
+    return res.json({
       success: true,
       data: activeDrivers,
     });
   } catch (error) {
-    logger.error('Get active drivers error:', error);
-    res.status(500).json({
+    logger.error('Get active drivers error', error);
+
+    return res.status(500).json({
       success: false,
       error: 'Failed to get active drivers',
     });
   }
 };
 
+/* ============================================================
+   CREATE GEOFENCE (ADMIN ONLY)
+============================================================ */
+
 export const createGeofence = async (req: Request, res: Response) => {
   try {
-    const geofenceData = req.body;
-
-    // Only admin can create geofences
     if (req.user?.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -308,63 +339,64 @@ export const createGeofence = async (req: Request, res: Response) => {
       });
     }
 
-    // Save geofence to database (you'll need to create a Geofence model)
-    // This is a placeholder - implement Geofence model as needed
     const geofence = {
-      ...geofenceData,
+      ...req.body,
       createdBy: req.user._id,
       createdAt: new Date(),
     };
 
-    // Emit geofence update
     const io = req.app.get('io');
-    io.emit('geofence-update', geofence);
+    io?.emit('geofence-update', geofence);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: geofence,
-      message: 'Geofence created successfully',
     });
   } catch (error) {
-    logger.error('Create geofence error:', error);
-    res.status(500).json({
+    logger.error('Create geofence error', error);
+
+    return res.status(500).json({
       success: false,
       error: 'Failed to create geofence',
     });
   }
 };
 
-export const checkGeofenceViolations = async (req: Request, res: Response) => {
+/* ============================================================
+   CHECK GEOFENCE VIOLATIONS
+============================================================ */
+
+export const checkGeofenceViolations = async (
+  req: Request,
+  res: Response
+) => {
   try {
     const { driverId } = req.params;
 
-    // Get driver's current location
-    const currentLocation = await Location.findOne({ driverId })
-      .sort({ timestamp: -1 });
+    const currentLocation = await Location.findOne({ driverId }).sort({
+      timestamp: -1,
+    });
 
     if (!currentLocation) {
       return res.status(404).json({
         success: false,
-        error: 'No location found for driver',
+        error: 'No location found',
       });
     }
 
-    // Check against active geofences (simplified - implement actual geofence checking)
-    // This is a placeholder - implement proper geofence checking logic
-    const violations: any[] = [];
-
-    res.json({
+    return res.json({
       success: true,
       data: {
         location: currentLocation,
-        violations,
+        violations: [],
       },
     });
   } catch (error) {
-    logger.error('Check geofence violations error:', error);
-    res.status(500).json({
+    logger.error('Geofence violation error', error);
+
+    return res.status(500).json({
       success: false,
-      error: 'Failed to check geofence violations',
+      error: 'Failed to check violations',
     });
   }
 };
