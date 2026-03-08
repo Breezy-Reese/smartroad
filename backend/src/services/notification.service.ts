@@ -3,18 +3,18 @@ import { sendSMS } from './sms.service';
 import { emailService } from './email.service';
 import { logger } from '../utils/logger';
 
-import { IncidentDocument } from '../types/incident.types';
+import { IIncident } from '../types/incident.types'; // Changed from IncidentDocument
 import { IEmergencyContact } from '../types/user.types';
 
 class NotificationService {
-  sendEmergencySMS(arg0: { to: string; message: string; }) {
+  sendEmergencySMS(_arg0: { to: string; message: string; }) {
     throw new Error('Method not implemented.');
   }
   // ================= EMERGENCY CONTACTS =================
 
   async notifyEmergencyContacts(
     contacts: IEmergencyContact[],
-    incident: IncidentDocument
+    incident: IIncident // Changed from IncidentDocument
   ): Promise<void> {
     const message = this.formatEmergencyMessage(incident);
 
@@ -58,7 +58,7 @@ class NotificationService {
 
   async notifyHospital(
     hospitalId: string,
-    incident: IncidentDocument
+    incident: IIncident // Changed from IncidentDocument
   ): Promise<void> {
     try {
       io.to(`hospital-${hospitalId}`).emit('emergency-alert', {
@@ -79,7 +79,7 @@ class NotificationService {
 
   async notifyResponder(
     responderId: string,
-    incident: IncidentDocument,
+    incident: IIncident, // Changed from IncidentDocument
     eta: number
   ): Promise<void> {
     try {
@@ -120,7 +120,7 @@ class NotificationService {
   // ================= BROADCAST =================
 
   async broadcastToHospitals(
-    incident: IncidentDocument,
+    incident: IIncident, // Changed from IncidentDocument
     hospitalIds?: string[]
   ): Promise<void> {
     try {
@@ -177,7 +177,7 @@ class NotificationService {
   // ================= INCIDENT UPDATE =================
 
   async sendIncidentUpdate(
-    incident: IncidentDocument,
+    incident: IIncident, // Changed from IncidentDocument
     updateType: 'status' | 'responder' | 'location'
   ): Promise<void> {
     try {
@@ -213,7 +213,7 @@ class NotificationService {
 
   // ================= HELPERS =================
 
-  private formatEmergencyMessage(incident: IncidentDocument): string {
+  private formatEmergencyMessage(incident: IIncident): string { // Changed from IncidentDocument
     const severity = incident.severity.toUpperCase();
 
     const location = incident.locationAddress

@@ -124,14 +124,32 @@ export const validateDateRange = (): ValidationChain[] => [
     .optional()
     .isISO8601().withMessage('Invalid end date format')
     .toDate()
-    .custom((endDateValue, { req }) => {
-      const startDateStr = req.query.startDate as string | undefined;
-
-      if (startDateStr) {
-        const startDate = new Date(startDateStr);
-        const endDate = new Date(endDateValue as Date);
-
-        if (endDate < startDate) {
+    .custom((endDate, { req }) => {
+      // Check if req and req.query exist
+      if (!req || !req.query) {
+        return true;
+      }
+      
+      const startDateParam = req.query.startDate;
+      const endDateParam = endDate;
+      
+      // Only validate if both dates are provided
+      if (startDateParam && endDateParam) {
+        // Convert startDate to Date object (it's a string from query)
+        const startDate = new Date(startDateParam as string);
+        
+        // endDateParam should already be a Date object from .toDate()
+        // but let's safely handle it
+        const endDateObj = endDateParam instanceof Date 
+          ? endDateParam 
+          : new Date(endDateParam as string);
+        
+        // Check if dates are valid
+        if (isNaN(startDate.getTime()) || isNaN(endDateObj.getTime())) {
+          throw new Error('Invalid date format');
+        }
+        
+        if (endDateObj < startDate) {
           throw new Error('End date must be after start date');
         }
       }

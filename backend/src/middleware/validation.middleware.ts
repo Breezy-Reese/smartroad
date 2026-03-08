@@ -14,10 +14,25 @@ export const validate = (validations: ValidationChain[]) => {
       return next();
     }
 
-    const formattedErrors = errors.array().map((error) => ({
-      field: error.param,
-      message: error.msg,
-    }));
+    const formattedErrors = errors.array().map((error) => {
+      // Handle different error formats
+      let field = 'unknown';
+      if (error.type === 'field') {
+        field = error.path || error.location || 'unknown';
+      } else if (error.type === 'alternative') {
+        field = 'alternative';
+      } else if (error.type === 'alternative_grouped') {
+        field = 'alternative_grouped';
+      }
+
+      return {
+        field,
+        message: error.msg,
+        // These might not exist on all error types
+        location: (error as any).location,
+        value: (error as any).value,
+      };
+    });
 
     logger.warn('Validation failed:', formattedErrors);
 
@@ -28,7 +43,6 @@ export const validate = (validations: ValidationChain[]) => {
     });
   };
 };
-
 /* ============================================================
    LOCATION VALIDATION
 ============================================================ */

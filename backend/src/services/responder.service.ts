@@ -1,92 +1,104 @@
 import { User } from '../models/User.model';
 import { Incident } from '../models/Incident.model';
-import { ResponderStatus } from '../models/Responder.model';
-
+import { ResponderStatus } from '../models/ResponderStatus.model';
 import { locationService } from './location.service';
 import { notificationService } from './notification.service';
 import { logger } from '../utils/logger';
-import { ICoordinates } from '../types';
+import { ICoordinates, IUser } from '../types';
 
 class ResponderService {
-  autoDispatch(arg0: string, location: ICoordinates) {
+  // =====================================================
+  // AUTO DISPATCH (stub if needed)
+  // =====================================================
+  autoDispatch(_responderId: string, _location: ICoordinates) {
     throw new Error('Method not implemented.');
   }
+
   // =====================================================
   // ASSIGN RESPONDER
   // =====================================================
-
   async assignResponder(
     incidentId: string,
     hospitalId: string
-  ): Promise<any> {
+  ): Promise<{ responder: IUser; eta: number; distance: number }> {
     try {
       const incident = await Incident.findById(incidentId);
       if (!incident) throw new Error('Incident not found');
 
       const responder = await this.findNearestAvailableResponder(
         hospitalId,
-        incident.location
+        {
+          lat: incident.location.coordinates[1],
+          lng: incident.location.coordinates[0],
+        }
       );
 
-      if (!responder) {
-        throw new Error('No available responders found');
-      }
+      if (!responder) throw new Error('No available responders found');
 
       const responderStatus = await ResponderStatus.findOne({
         responderId: responder._id,
       });
-
-      if (!responderStatus) {
-        throw new Error('Responder status not found');
-      }
+      if (!responderStatus) throw new Error('Responder status not found');
 
       const eta = locationService.calculateETA(
-        responderStatus.currentLocation,
-        incident.location
+        {
+          lat: responderStatus.currentLocation.coordinates[1],
+          lng: responderStatus.currentLocation.coordinates[0],
+        },
+        {
+          lat: incident.location.coordinates[1],
+          lng: incident.location.coordinates[0],
+        }
       );
 
       const distance = locationService.calculateDistance(
-        responderStatus.currentLocation,
-        incident.location
+        {
+          lat: responderStatus.currentLocation.coordinates[1],
+          lng: responderStatus.currentLocation.coordinates[0],
+        },
+        {
+          lat: incident.location.coordinates[1],
+          lng: incident.location.coordinates[0],
+        }
       );
 
-      const responderInfo = {
-        id: responder._id.toString(),
-        name: responder.name,
-        type: responder.responderType,
-        hospital: hospitalId,
-        eta,
-        distance,
-        status: 'dispatched',
-        location: responderStatus.currentLocation,
-        dispatchedAt: new Date(),
-      };
+ // FIXED: Match the ResponderSchema structure from the model
+const responderInfo = {
+  responderId: responder._id,
+  name: responder.name || '',
+  type: (responder.responderType as 'ambulance' | 'police' | 'fire' | 'rescue') || 'ambulance',
+  hospital: hospitalId,
+  eta,
+  distance,
+  status: 'dispatched',
+  location: {
+    lat: incident.location.coordinates[1],
+    lng: incident.location.coordinates[0],
+  },
+  contactNumber: responder.phone,
+  dispatchedAt: new Date(),
+};
 
-      incident.responders.push(responderInfo);
-      incident.status = 'dispatched';
+incident.responders.push(responderInfo as any);
+incident.status = 'dispatched';
+await incident.save();
 
-      await incident.save();
+responderStatus.isAvailable = false;
+responderStatus.currentIncidentId = incident._id;
+responderStatus.status = 'en-route';
+await responderStatus.save();
 
-      responderStatus.isAvailable = false;
-      responderStatus.currentIncidentId = incident._id;
-      responderStatus.status = 'en-route';
-      await responderStatus.save();
+// Convert incident to plain object for notification
+const incidentObject = (incident as any).toObject();
 
-      await notificationService.notifyResponder(
-        responder._id.toString(),
-        incident,
-        eta
-      );
+await notificationService.notifyResponder(String(responder._id), incidentObject, eta);
+await notificationService.notifyDriver(
+  String(incident.driverId), 
+  'A responder has been dispatched', 
+  { responder: responderInfo }
+);
 
-      await notificationService.notifyDriver(
-        incident.driverId.toString(),
-        'A responder has been dispatched',
-        { responder: responderInfo }
-      );
-
-      logger.info(
-        `Responder ${responder.name} assigned to incident ${incident.incidentId}`
-      );
+      logger.info(`Responder ${responder.name} assigned to incident ${incident.incidentId}`);
 
       return { responder, eta, distance };
     } catch (error) {
@@ -98,16 +110,15 @@ class ResponderService {
   // =====================================================
   // UPDATE RESPONDER LOCATION
   // =====================================================
-
-  async updateResponderLocation(
-    responderId: string,
-    location: { lat: number; lng: number }
-  ): Promise<void> {
+  async updateResponderLocation(responderId: string, location: ICoordinates): Promise<void> {
     try {
       const responderStatus = await ResponderStatus.findOneAndUpdate(
         { responderId },
         {
-          currentLocation: location,
+          currentLocation: {
+            type: 'Point',
+            coordinates: [location.lng, location.lat],
+          },
           lastUpdate: new Date(),
         },
         { new: true, upsert: true }
@@ -115,30 +126,23 @@ class ResponderService {
 
       if (!responderStatus?.currentIncidentId) return;
 
-      const incident = await Incident.findById(
-        responderStatus.currentIncidentId
-      );
-
+      const incident = await Incident.findById(responderStatus.currentIncidentId);
       if (!incident) return;
 
-      const eta = locationService.calculateETA(
-        location,
-        incident.location
-      );
+      const eta = locationService.calculateETA(location, {
+        lat: incident.location.coordinates[1],
+        lng: incident.location.coordinates[0],
+      });
 
-      const index = incident.responders.findIndex(
-        r => r.id === responderId
-      );
-
+      const index = incident.responders.findIndex(r => r.id === responderId);
       if (index !== -1) {
         incident.responders[index].eta = eta;
         incident.responders[index].location = location;
-
         await incident.save();
 
         await notificationService.notifyDriver(
-          incident.driverId.toString(),
-          `Responder ETA updated to ${eta} minutes`,
+          String(incident.driverId), 
+          `Responder ETA updated to ${eta} minutes`, 
           { responderId, eta }
         );
       }
@@ -153,15 +157,9 @@ class ResponderService {
   // =====================================================
   // UPDATE RESPONDER STATUS
   // =====================================================
-
   async updateResponderStatus(
     responderId: string,
-    status:
-      | 'available'
-      | 'en-route'
-      | 'on-scene'
-      | 'transporting'
-      | 'off-duty'
+    status: 'available' | 'en-route' | 'on-scene' | 'transporting' | 'off-duty'
   ): Promise<void> {
     try {
       const responderStatus = await ResponderStatus.findOneAndUpdate(
@@ -187,45 +185,43 @@ class ResponderService {
   }
 
   // =====================================================
-  // FIND NEAREST RESPONDER
+  // FIND NEAREST AVAILABLE RESPONDER
   // =====================================================
-
-  async findNearestAvailableResponder(
-    hospitalId: string,
-    location: { lat: number; lng: number }
-  ) {
+  async findNearestAvailableResponder(hospitalId: string, location: ICoordinates): Promise<IUser | null> {
     try {
       const responders = await User.find({
         role: 'responder',
         hospitalId,
         isActive: true,
-      });
+      }).lean();
 
       if (!responders.length) return null;
 
       const responderIds = responders.map(r => r._id);
-
+      
       const statuses = await ResponderStatus.find({
         responderId: { $in: responderIds },
         isAvailable: true,
-      });
+      }).lean();
 
       if (!statuses.length) return null;
 
-      let nearest: any = null;
+      let nearest: IUser | null = null;
       let minDistance = Infinity;
 
       for (const status of statuses) {
-        const distance = locationService.calculateDistance(
-          location,
-          status.currentLocation
-        );
-
+        const distance = locationService.calculateDistance(location, {
+          lat: status.currentLocation.coordinates[1],
+          lng: status.currentLocation.coordinates[0],
+        });
         if (distance < minDistance) {
           minDistance = distance;
-          nearest = responders.find(
-            r => r._id.toString() === status.responderId.toString()
+          const responder = responders.find(r => 
+            String(r._id) === String(status.responderId)
           );
+          if (responder) {
+            nearest = responder as unknown as IUser;
+          }
         }
       }
 
@@ -239,33 +235,29 @@ class ResponderService {
   // =====================================================
   // RESPONDER DASHBOARD
   // =====================================================
-
   async getResponderDashboard(responderId: string) {
     try {
-      const responder = await User.findById(responderId);
+      const responder = await User.findById(responderId).lean();
       if (!responder) throw new Error('Responder not found');
 
-      const status = await ResponderStatus.findOne({ responderId });
-
+      const status = await ResponderStatus.findOne({ responderId }).lean();
+      
       let currentIncident = null;
-
       if (status?.currentIncidentId) {
-        currentIncident = await Incident.findById(
-          status.currentIncidentId
-        ).populate('driverId', 'name phone');
+        currentIncident = await Incident.findById(status.currentIncidentId)
+          .populate('driverId', 'name phone')
+          .lean();
       }
 
       const hospital = responder.hospitalId
-        ? await User.findById(responder.hospitalId).select(
-            'hospitalName location'
-          )
+        ? await User.findById(responder.hospitalId).select('hospitalName location').lean()
         : null;
 
-      return {
+      return { 
         responder,
-        status,
-        currentIncident,
-        hospital,
+        status, 
+        currentIncident, 
+        hospital 
       };
     } catch (error) {
       logger.error('Responder dashboard error:', error);
@@ -276,40 +268,26 @@ class ResponderService {
   // =====================================================
   // MARK ARRIVED
   // =====================================================
-
-  async markResponderArrived(
-    responderId: string,
-    incidentId: string
-  ): Promise<void> {
+  async markResponderArrived(responderId: string, incidentId: string): Promise<void> {
     try {
       const incident = await Incident.findById(incidentId);
       if (!incident) throw new Error('Incident not found');
 
-      const index = incident.responders.findIndex(
-        r => r.id === responderId
-      );
-
+      const index = incident.responders.findIndex(r => r.id === responderId);
       if (index !== -1) {
         incident.responders[index].status = 'arrived';
         incident.responders[index].arrivedAt = new Date();
         incident.status = 'arrived';
-
         await incident.save();
 
-        await ResponderStatus.findOneAndUpdate(
-          { responderId },
-          { status: 'on-scene' }
-        );
-
+        await ResponderStatus.findOneAndUpdate({ responderId }, { status: 'on-scene' });
         await notificationService.notifyDriver(
-          incident.driverId.toString(),
+          String(incident.driverId), 
           'Responder has arrived at the scene'
         );
       }
 
-      logger.info(
-        `Responder ${responderId} marked arrived for incident ${incidentId}`
-      );
+      logger.info(`Responder ${responderId} marked arrived for incident ${incidentId}`);
     } catch (error) {
       logger.error('Mark responder arrived error:', error);
       throw error;
@@ -319,32 +297,21 @@ class ResponderService {
   // =====================================================
   // COMPLETE INCIDENT
   // =====================================================
-
-  async completeIncident(
-    responderId: string,
-    incidentId: string
-  ): Promise<void> {
+  async completeIncident(responderId: string, incidentId: string): Promise<void> {
     try {
       const incident = await Incident.findById(incidentId);
       if (!incident) throw new Error('Incident not found');
 
       incident.status = 'resolved';
       incident.resolvedAt = new Date();
-
       await incident.save();
 
       await ResponderStatus.findOneAndUpdate(
         { responderId },
-        {
-          isAvailable: true,
-          status: 'available',
-          currentIncidentId: null,
-        }
+        { isAvailable: true, status: 'available', currentIncidentId: null }
       );
 
-      logger.info(
-        `Responder ${responderId} completed incident ${incidentId}`
-      );
+      logger.info(`Responder ${responderId} completed incident ${incidentId}`);
     } catch (error) {
       logger.error('Complete incident error:', error);
       throw error;

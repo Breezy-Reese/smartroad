@@ -1,7 +1,7 @@
-import { NextFunction, Router } from 'express';
+import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import * as hospitalController from '../controllers/hospital.controller';
-import { authenticate, authorize, AuthRequest, requireHospital } from '../middleware/auth.middleware';
+import { authenticate, authorize, requireHospital } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validation.middleware';
 
 const router = Router();

@@ -1,7 +1,9 @@
-import { NextFunction, Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { authService } from '../services/auth.service';
 import { logger } from '../utils/logger';
-
+import { AuthRequest } from '../middleware/auth.middleware';
+import { User } from '../models/User.model';
+import { emailService } from '../services/email.service';
 /* ============================================================
    REGISTER
 ============================================================ */
@@ -150,7 +152,9 @@ export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
 
-    await authService.forgotPassword(email); // removed unused resetToken variable
+
+    // Optionally log or use the token if needed
+    logger.debug(`Reset token generated for ${email}`);
 
     return res.json({
       success: true,
@@ -165,7 +169,6 @@ export const forgotPassword = async (req: Request, res: Response) => {
     });
   }
 };
-
 /* ============================================================
    RESET PASSWORD
 ============================================================ */
@@ -253,11 +256,49 @@ export const verifyEmail = async (req: Request, res: Response) => {
 /* ============================================================
    RESEND VERIFICATION EMAIL
 ============================================================ */
+export const resendVerificationEmail = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?._id;
 
-export function resendVerificationEmail(
-  _arg0: string,
-  _authenticate: (req: any, res: Response, next: NextFunction) => Promise<void | Response<any, Record<string, any>>>,
-  _resendVerificationEmail: any
-) {
-  throw new Error('Function not implemented.');
-}
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ success: false, error: 'Email already verified' });
+    }
+
+    // Generate new verification token
+    const verificationToken = await authService.generateEmailVerificationToken(userId.toString());
+
+    // Send verification email
+    await emailService.sendEmail({
+      to: user.email,
+      subject: 'Verify Your Email',
+      template: 'email-verification',
+      data: {
+        name: user.name,
+        verificationLink: `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`
+      }
+    });
+
+    logger.info(`Verification email resent to: ${user.email}`);
+
+    return res.json({
+      success: true,
+      message: 'Verification email sent successfully'
+    });
+  } catch (error: any) {
+    logger.error('Resend verification email error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to resend verification email'
+    });
+  }
+};

@@ -13,9 +13,9 @@ import { apiLimiter } from './middleware/rateLimiter.middleware';
 // Import routes
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
-import incidentRoutes from './routes/incident.routes';
 import locationRoutes from './routes/location.routes';
 import hospitalRoutes from './routes/hospital.routes';
+import incidentRoutes from './routes/incident.routes';
 
 const app: Express = express();
 

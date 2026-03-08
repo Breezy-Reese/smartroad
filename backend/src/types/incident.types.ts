@@ -1,5 +1,4 @@
-import { Document } from 'mongoose';
-import { ICoordinates } from './user.types';
+import { ICoordinates, IEmergencyContact } from './user.types'; // Import IEmergencyContact
 
 export type IncidentStatus = 
   | 'pending' 
@@ -17,7 +16,7 @@ export type IncidentStatus =
 export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical' | 'fatal';
 export type IncidentType = 'collision' | 'rollover' | 'fire' | 'medical' | 'other';
 
-export interface Incident {
+export interface IIncident {
   _id: string;
   incidentId: string;
   driverId: string;
@@ -54,7 +53,7 @@ export interface Incident {
   
   // Response
   responders: IResponderInfo[];
-  emergencyContacts: IEmergencyContact[];
+  emergencyContacts: IEmergencyContact[]; // Now using imported type
   hospitalId?: string;
   assignedAmbulance?: string;
   assignedHospital?: string;
@@ -81,15 +80,7 @@ export interface IResponderInfo {
   completedAt?: Date;
 }
 
-export interface IEmergencyContact {
-  _id: string;
-  name: string;
-  relationship: string;
-  phone: string;
-  email?: string;
-  isNotified: boolean;
-  notifiedAt?: Date;
-}
+// REMOVED: export interface IEmergencyContact { ... }  ← Delete this entire block
 
 export interface IIncidentTimeline {
   _id: string;
@@ -116,7 +107,7 @@ export interface ICreateIncidentDTO {
   occupants?: number;
   vehicleId?: string;
   vehicleNumber?: string;
-  emergencyContacts?: IEmergencyContact[];
+  emergencyContacts?: IEmergencyContact[]; // Using imported type
 }
 
 export interface IUpdateIncidentDTO {

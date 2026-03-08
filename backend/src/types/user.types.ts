@@ -5,6 +5,7 @@ export interface ICoordinates {
   lng: number;
 }
 
+// user.types.ts
 export interface IEmergencyContact {
   _id?: string;
   name: string;
@@ -13,6 +14,7 @@ export interface IEmergencyContact {
   email?: string;
   isPrimary?: boolean;
   isNotified?: boolean;
+  notifiedAt?: Date;  // Add this field
 }
 
 export interface IMedicalInfo {
@@ -47,6 +49,7 @@ export interface IUser {
   licenseNumber?: string;
   licenseExpiry?: Date;
   vehicleId?: string;
+  vehicleNumber?: string;  // ← ADD THIS LINE (for vehicle plate number)
 
   hospitalName?: string;
   registrationNumber?: string;
@@ -66,6 +69,8 @@ export interface IUser {
   experience?: number;
 
   emailVerificationToken?: string;
+  passwordResetToken?: string;      // ← ADD THIS LINE (for password reset)
+  passwordResetExpires?: Date;      // ← ADD THIS LINE (for password reset expiry)
 }
 
 export interface IAuthTokens {

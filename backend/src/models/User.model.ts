@@ -1,37 +1,94 @@
 import mongoose, { Schema, Model, Document, Types } from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { IUser, IEmergencyContact, IMedicalInfo } from '../types/user.types';
+import {  
+  IEmergencyContact, 
+  IMedicalInfo, 
+  ICoordinates,
+  UserRole 
+} from '../types/user.types';
 
 /* ============================================================
    TYPES
 ============================================================ */
-export interface IUserDocument extends IUser, Document<Types.ObjectId> {
+export interface IUserDocument extends Document {
+  _id: Types.ObjectId;
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  phone: string;
+  profileImage?: string;
+  isActive?: boolean;
+  isVerified?: boolean;
+  lastLogin?: Date;
+  refreshToken?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  emergencyContacts?: IEmergencyContact[];
+  medicalInfo?: IMedicalInfo;
+  licenseNumber?: string;
+  licenseExpiry?: Date;
+  vehicleId?: Types.ObjectId;
+  vehicleNumber?: string;
+  hospitalName?: string;
+  registrationNumber?: string;
+  address?: string;
+  location?: ICoordinates;
+  contactNumber?: string;
+  emergencyContact?: string;
+  responderType?: 'ambulance' | 'police' | 'fire' | 'rescue';
+  hospitalId?: Types.ObjectId;
+  currentLocation?: ICoordinates;
+  currentIncidentId?: Types.ObjectId;
+  certifications?: string[];
+  experience?: number;
+  emailVerificationToken?: string;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
+  
+  // Methods
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
-
 /* ============================================================
    SUB SCHEMAS
 ============================================================ */
 const EmergencyContactSchema = new Schema<IEmergencyContact>(
   {
-    name: { type: String, required: true },
-    relationship: { type: String, required: true },
-    phone: { type: String, required: true },
-    email: { type: String },
+    name: { type: String, required: true, trim: true },
+    relationship: { type: String, required: true, trim: true },
+    phone: { type: String, required: true, trim: true },
+    email: { 
+      type: String, 
+      trim: true, 
+      lowercase: true,
+      match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address']
+    },
     isPrimary: { type: Boolean, default: false },
     isNotified: { type: Boolean, default: false },
+    notifiedAt: { type: Date }
   },
-  { _id: true }
+  { _id: true, timestamps: true }
 );
 
 const MedicalInfoSchema = new Schema<IMedicalInfo>(
   {
-    bloodGroup: String,
-    allergies: [String],
-    medicalConditions: [String],
-    medications: [String],
-    emergencyNotes: String,
+    bloodGroup: { 
+      type: String, 
+      enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'], 
+    },
+    allergies: { type: [String], default: [] },
+    medicalConditions: { type: [String], default: [] },
+    medications: { type: [String], default: [] },
+    emergencyNotes: { type: String, trim: true },
     organDonor: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const CoordinatesSchema = new Schema<ICoordinates>(
+  {
+    lat: { type: Number, required: true, min: -90, max: 90 },
+    lng: { type: Number, required: true, min: -180, max: 180 }
   },
   { _id: false }
 );
@@ -41,62 +98,156 @@ const MedicalInfoSchema = new Schema<IMedicalInfo>(
 ============================================================ */
 const UserSchema = new Schema<IUserDocument>(
   {
-    name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true },
-    password: { type: String, required: true, select: false },
-    role: { type: String, enum: ['driver', 'hospital', 'admin', 'responder'], default: 'driver' },
-    phone: { type: String, required: true },
-    profileImage: { type: String, default: 'default-avatar.png' },
+    name: { type: String, required: [true, 'Name is required'], trim: true },
+    email: { 
+      type: String, 
+      required: [true, 'Email is required'], 
+      unique: true, 
+      lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address']
+    },
+    password: { 
+      type: String, 
+      required: [true, 'Password is required'], 
+      select: false,
+      minlength: [6, 'Password must be at least 6 characters']
+    },
+    role: { 
+      type: String, 
+      enum: {
+        values: ['driver', 'hospital', 'admin', 'responder'] as UserRole[],
+        message: '{VALUE} is not a valid role'
+      }, 
+      required: true,
+      default: 'driver' 
+    },
+    phone: { 
+      type: String, 
+      required: [true, 'Phone number is required'],
+      trim: true,
+      match: [/^\+?[\d\s-]{10,}$/, 'Please provide a valid phone number']
+    },
+    profileImage: { 
+      type: String, 
+      default: 'default-avatar.png' 
+    },
     isActive: { type: Boolean, default: true },
     isVerified: { type: Boolean, default: false },
-    lastLogin: Date,
+    lastLogin: { type: Date },
     refreshToken: { type: String, select: false },
+    emailVerificationToken: { type: String, select: false },
+    
+    // Password reset fields
+    passwordResetToken: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
 
-    /* ================= DRIVER FIELDS ================= */
-    licenseNumber: { type: String },
-    licenseExpiry: { type: Date },
-    vehicleId: { type: Types.ObjectId, ref: 'Vehicle' },
+    // Emergency and medical info
     emergencyContacts: { type: [EmergencyContactSchema], default: [] },
     medicalInfo: { type: MedicalInfoSchema, default: {} },
-    drivingExperience: { type: Number, default: 0 },
-    rating: { type: Number, min: 0, max: 5, default: 0 },
-    totalTrips: { type: Number, default: 0 },
 
-    /* ================= HOSPITAL FIELDS ================= */
-    hospitalName: { type: String },
-    registrationNumber: { type: String },
-    address: { type: String },
-    location: { lat: Number, lng: Number },
-    contactNumber: { type: String },
-    emergencyContact: { type: String },
-    capacity: {
-      beds: { type: Number, default: 0 },
-      ambulances: { type: Number, default: 0 },
-      responders: { type: Number, default: 0 },
+    // Driver fields
+    licenseNumber: { 
+      type: String, 
+      trim: true,
+      sparse: true,
+      unique: true,
+      match: [/^[A-Z0-9-]+$/, 'Invalid license number format']
     },
-    services: { type: [String], default: [] },
-    isAvailable: { type: Boolean, default: true },
+    licenseExpiry: { type: Date },
+    vehicleId: { type: Types.ObjectId, ref: 'Vehicle' },
+    vehicleNumber: { type: String, trim: true },
 
-    /* ================= RESPONDER FIELDS ================= */
-    responderType: { type: String, enum: ['ambulance', 'paramedic', 'doctor', 'rescue'] },
+    // Hospital fields
+    hospitalName: { type: String, trim: true },
+    registrationNumber: { type: String, trim: true },
+    address: { type: String, trim: true },
+    location: { type: CoordinatesSchema },
+    contactNumber: { type: String, trim: true },
+    emergencyContact: { type: String, trim: true },
+
+    // Responder fields
+    responderType: { 
+      type: String, 
+      enum: {
+        values: ['ambulance', 'police', 'fire', 'rescue'],
+        message: '{VALUE} is not a valid responder type'
+      } 
+    },
     hospitalId: { type: Types.ObjectId, ref: 'User' },
-    currentLocation: { lat: Number, lng: Number },
+    currentLocation: { type: CoordinatesSchema },
     currentIncidentId: { type: Types.ObjectId, ref: 'Incident' },
     certifications: { type: [String], default: [] },
-    experience: { type: Number, default: 0 },
+    experience: { type: Number, default: 0, min: 0 },
   },
-  {
-    timestamps: true,
-    toJSON: {
-      transform: (_, ret) => {
-        delete ret.password;
-        delete ret.refreshToken;
-        delete ret.__v;
-        return ret;
-      },
+ {
+  timestamps: true,
+  toJSON: {
+    transform: (_doc: IUserDocument, ret: Record<string, any>) => {
+      delete ret.password;
+      delete ret.refreshToken;
+      delete ret.emailVerificationToken;
+      delete ret.passwordResetToken;
+      delete ret.passwordResetExpires;
+      delete ret.__v;
+      
+      if (ret._id) ret._id = ret._id.toString();
+      if (ret.vehicleId) ret.vehicleId = ret.vehicleId.toString();
+      if (ret.hospitalId) ret.hospitalId = ret.hospitalId.toString();
+      if (ret.currentIncidentId) ret.currentIncidentId = ret.currentIncidentId.toString();
+      
+      return ret;
     },
-  }
+  },
+}
 );
+// Compound index for role + active status
+UserSchema.index({ role: 1, isActive: 1 });
+
+// Unique indexes
+UserSchema.index({ email: 1 }, { 
+  unique: true,
+  background: true 
+});
+
+UserSchema.index({ phone: 1 }, { 
+  background: true 
+});
+
+// Sparse unique index for optional license number
+UserSchema.index({ licenseNumber: 1 }, { 
+  sparse: true, 
+  unique: true,
+  background: true 
+});
+
+// Geospatial indexes for location queries
+UserSchema.index({ 
+  "location.lat": 1, 
+  "location.lng": 1 
+}, { 
+  background: true 
+});
+
+UserSchema.index({ 
+  "currentLocation.lat": 1, 
+  "currentLocation.lng": 1 
+}, { 
+  background: true 
+});
+
+// Compound index for hospital queries
+UserSchema.index({ 
+  hospitalId: 1, 
+  role: 1 
+}, { 
+  background: true 
+});
+
+// Sort index for createdAt
+UserSchema.index({ createdAt: -1 }, { 
+  background: true 
+});
 
 /* ============================================================
    PASSWORD HASHING
@@ -104,12 +255,19 @@ const UserSchema = new Schema<IUserDocument>(
 UserSchema.pre<IUserDocument>('save', async function (next) {
   if (!this.isModified('password')) return next();
   try {
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
     next();
   } catch (err) {
-    next(err as any);
+    next(err as Error);
   }
+});
+
+/* ============================================================
+   VIRTUAL PROPERTIES
+============================================================ */
+UserSchema.virtual('fullName').get(function() {
+  return this.name;
 });
 
 /* ============================================================
@@ -118,10 +276,42 @@ UserSchema.pre<IUserDocument>('save', async function (next) {
 UserSchema.methods.comparePassword = async function (
   candidatePassword: string
 ): Promise<boolean> {
-  return bcrypt.compare(candidatePassword, this.password);
+  try {
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    throw new Error('Password comparison failed');
+  }
+};
+
+// Method to get public profile
+UserSchema.methods.getPublicProfile = function() {
+  const userObject = this.toObject();
+  delete userObject.password;
+  delete userObject.refreshToken;
+  delete userObject.emailVerificationToken;
+  delete userObject.passwordResetToken;
+  delete userObject.passwordResetExpires;
+  delete userObject.__v;
+  return userObject;
+};
+
+/* ============================================================
+   STATIC METHODS
+============================================================ */
+UserSchema.statics.findByEmail = function(email: string) {
+  return this.findOne({ email: email.toLowerCase() });
+};
+
+UserSchema.statics.findActiveDrivers = function() {
+  return this.find({ role: 'driver', isActive: true });
 };
 
 /* ============================================================
    MODEL EXPORT
 ============================================================ */
-export const User: Model<IUserDocument> = mongoose.model<IUserDocument>('User', UserSchema);
+interface UserModel extends Model<IUserDocument> {
+  findByEmail(email: string): Promise<IUserDocument | null>;
+  findActiveDrivers(): Promise<IUserDocument[]>;
+}
+
+export const User = mongoose.model<IUserDocument, UserModel>('User', UserSchema);

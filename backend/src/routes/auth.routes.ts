@@ -1,7 +1,7 @@
-import { NextFunction, Router } from 'express';
+import { Router } from 'express';
 import { body } from 'express-validator';
 import * as authController from '../controllers/auth.controller';
-import { authenticate, refreshTokenAuth, logout, AuthRequest } from '../middleware/auth.middleware';
+import { authenticate, refreshTokenAuth, logout } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validation.middleware';
 import { authLimiter } from '../middleware/rateLimiter.middleware';
 

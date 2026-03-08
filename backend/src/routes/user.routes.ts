@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import * as userController from '../controllers/user.controller';
-import { authenticate, authorize, checkOwnership, requireAdmin } from '../middleware/auth.middleware';
+import { authenticate, authorize, requireAdmin } from '../middleware/auth.middleware'; // Removed checkOwnership if not used
 import { validate } from '../middleware/validation.middleware';
 
 const router = Router();
@@ -10,30 +10,46 @@ const router = Router();
 const updateProfileValidation = [
   body('name')
     .optional()
-    .isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
+    .isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters')
+    .trim(),
   body('phone')
     .optional()
-    .matches(/^\+?[\d\s-]{10,}$/).withMessage('Please provide a valid phone number'),
+    .matches(/^\+?[\d\s-]{10,}$/).withMessage('Please provide a valid phone number')
+    .trim(),
   body('profileImage')
     .optional()
     .isURL().withMessage('Profile image must be a valid URL'),
+  body('address')
+    .optional()
+    .isString().withMessage('Address must be a string'),
+  body('location.lat')
+    .optional()
+    .isFloat({ min: -90, max: 90 }).withMessage('Invalid latitude'),
+  body('location.lng')
+    .optional()
+    .isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude'),
 ];
 
 const emergencyContactValidation = [
   body('name')
     .notEmpty().withMessage('Contact name is required')
-    .isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
+    .isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters')
+    .trim(),
   body('relationship')
-    .notEmpty().withMessage('Relationship is required'),
+    .notEmpty().withMessage('Relationship is required')
+    .trim(),
   body('phone')
     .notEmpty().withMessage('Phone number is required')
-    .matches(/^\+?[\d\s-]{10,}$/).withMessage('Please provide a valid phone number'),
+    .matches(/^\+?[\d\s-]{10,}$/).withMessage('Please provide a valid phone number')
+    .trim(),
   body('email')
     .optional()
-    .isEmail().withMessage('Please provide a valid email'),
+    .isEmail().withMessage('Please provide a valid email')
+    .normalizeEmail(),
   body('isPrimary')
     .optional()
-    .isBoolean().withMessage('isPrimary must be a boolean'),
+    .isBoolean().withMessage('isPrimary must be a boolean')
+    .toBoolean(),
 ];
 
 const medicalInfoValidation = [
@@ -43,15 +59,33 @@ const medicalInfoValidation = [
   body('allergies')
     .optional()
     .isArray().withMessage('Allergies must be an array'),
+  body('allergies.*')
+    .optional()
+    .isString().withMessage('Each allergy must be a string'),
   body('medicalConditions')
     .optional()
     .isArray().withMessage('Medical conditions must be an array'),
+  body('medicalConditions.*')
+    .optional()
+    .isString().withMessage('Each medical condition must be a string'),
   body('medications')
     .optional()
     .isArray().withMessage('Medications must be an array'),
+  body('medications.*')
+    .optional()
+    .isString().withMessage('Each medication must be a string'),
   body('organDonor')
     .optional()
-    .isBoolean().withMessage('organDonor must be a boolean'),
+    .isBoolean().withMessage('organDonor must be a boolean')
+    .toBoolean(),
+];
+
+const changePasswordValidation = [
+  body('currentPassword')
+    .notEmpty().withMessage('Current password is required'),
+  body('newPassword')
+    .notEmpty().withMessage('New password is required')
+    .isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
 ];
 
 const userIdParamValidation = [
@@ -67,17 +101,28 @@ const contactIdParamValidation = [
 const paginationValidation = [
   query('page')
     .optional()
-    .isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    .isInt({ min: 1 }).withMessage('Page must be a positive integer')
+    .toInt(),
   query('limit')
     .optional()
-    .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100')
+    .toInt(),
   query('search')
     .optional()
-    .isString().withMessage('Search must be a string'),
+    .isString().withMessage('Search must be a string')
+    .trim(),
   query('status')
     .optional()
-    .isIn(['online', 'offline']).withMessage('Status must be either online or offline'),
+    .isIn(['online', 'offline', 'all']).withMessage('Status must be online, offline, or all'),
+  query('hospitalId')
+    .optional()
+    .isMongoId().withMessage('Invalid hospital ID format'),
 ];
+
+// ==================== PUBLIC ROUTES ====================
+// None yet
+
+// ==================== PROTECTED ROUTES ====================
 
 // Profile routes
 router.get('/profile/:userId?', 
@@ -90,6 +135,13 @@ router.put('/profile',
   authenticate,
   validate(updateProfileValidation),
   userController.updateUserProfile
+);
+
+// Password change
+router.put('/change-password',
+  authenticate,
+  validate(changePasswordValidation),
+  userController.changePassword
 );
 
 // Emergency contacts
@@ -123,7 +175,9 @@ router.put('/medical-info',
   userController.updateMedicalInfo
 );
 
-// Admin only routes
+// ==================== ADMIN/HOSPITAL ROUTES ====================
+
+// Get all drivers (admin/hospital)
 router.get('/drivers',
   authenticate,
   authorize('admin', 'hospital'),
@@ -131,6 +185,7 @@ router.get('/drivers',
   userController.getAllDrivers
 );
 
+// Get all hospitals (admin only)
 router.get('/hospitals',
   authenticate,
   authorize('admin'),
@@ -138,6 +193,17 @@ router.get('/hospitals',
   userController.getAllHospitals
 );
 
+// Get all responders (admin/hospital)
+router.get('/responders',
+  authenticate,
+  authorize('admin', 'hospital'),
+  validate(paginationValidation),
+  userController.getAllResponders
+);
+
+// ==================== ADMIN ONLY ROUTES ====================
+
+// Update user status (activate/deactivate)
 router.put('/:userId/status',
   authenticate,
   requireAdmin,
@@ -148,6 +214,7 @@ router.put('/:userId/status',
   userController.updateUserStatus
 );
 
+// Delete user
 router.delete('/:userId',
   authenticate,
   requireAdmin,
