@@ -1,13 +1,17 @@
 import { Request, Response } from 'express';
 import { Incident } from '../models/Incident.model';
-import { User } from '../models/User.model';
-import { Location } from '../models/Location.model';
+// Remove unused imports or comment them out for now
+// import { User } from '../models/User.model';
+// import { Location } from '../models/Location.model';
 import { HospitalStats } from '../models/Hospital.model';
 import { ResponderStatus } from '../models/ResponderStatus.model';
 import { logger } from '../utils/logger';
-import { incidentService } from '../services/incident.service';
+import { IncidentService } from '../services/incident.service'; // Changed from incidentService to IncidentService
 import { notificationService } from '../services/notification.service';
 import { AuthRequest } from '../middleware/auth.middleware';
+
+// Create an instance of the service
+const incidentService = new IncidentService();
 // REMOVED: Any router-related imports like Router, body, param, query, validate, etc.
 
 // ... all your controller functions remain the same ...

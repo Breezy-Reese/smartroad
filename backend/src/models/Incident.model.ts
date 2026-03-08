@@ -50,10 +50,9 @@ export type ResponderType =
 ============================================================ */
 
 export interface IGeoLocation {
-  lng: any;
-  lat: any;
   type: "Point";
   coordinates: [number, number]; // [lng, lat]
+  // REMOVED: lng and lat - they don't belong in GeoJSON
 }
 
 const GeoLocationSchema = new Schema<IGeoLocation>(
@@ -77,8 +76,7 @@ const GeoLocationSchema = new Schema<IGeoLocation>(
 ============================================================ */
 
 export interface IResponderInfo {
-  id: any;
-  responderId: Types.ObjectId;
+  responderId: Types.ObjectId; // Fixed: removed 'id' field
   name: string;
   type: ResponderType;
   hospital?: string;
@@ -232,8 +230,8 @@ const IncidentSchema = new Schema<IncidentDocument>(
     driverId: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
-      index: true
+      required: true
+      // REMOVED: index: true (handled by schema.index below)
     },
 
     driverName: { type: String, required: true },
@@ -266,8 +264,8 @@ const IncidentSchema = new Schema<IncidentDocument>(
         "cancelled",
         "false-alarm"
       ],
-      default: "pending",
-      index: true
+      default: "pending"
+      // REMOVED: index: true (handled by schema.index below)
     },
 
     location: {
@@ -320,10 +318,12 @@ const IncidentSchema = new Schema<IncidentDocument>(
    INDEXES
 ============================================================ */
 
+// All indexes defined here (single source of truth)
 IncidentSchema.index({ location: "2dsphere" });
 IncidentSchema.index({ timestamp: -1 });
 IncidentSchema.index({ severity: 1 });
 IncidentSchema.index({ status: 1 });
+IncidentSchema.index({ driverId: 1 }); // Added this since it was removed from field
 
 /* ============================================================
    MODEL

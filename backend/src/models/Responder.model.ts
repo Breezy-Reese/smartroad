@@ -63,14 +63,14 @@ const ResponderStatusSchema = new Schema<IResponderStatus>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      unique: true,
-      index: true,
+      unique: true
+      // REMOVED: index: true (handled by schema.index below, and unique already creates an index)
     },
 
     isAvailable: {
       type: Boolean,
-      default: true,
-      index: true,
+      default: true
+      // REMOVED: index: true (handled by schema.index below)
     },
 
     currentLocation: {
@@ -93,8 +93,8 @@ const ResponderStatusSchema = new Schema<IResponderStatus>(
         'transporting',
         'off-duty',
       ],
-      default: 'available',
-      index: true,
+      default: 'available'
+      // REMOVED: index: true (handled by schema.index below)
     },
 
     lastUpdate: {
@@ -111,12 +111,15 @@ const ResponderStatusSchema = new Schema<IResponderStatus>(
    INDEXES
 ============================================================ */
 
+// All indexes defined here (single source of truth)
+
 // Required for location-based queries
 ResponderStatusSchema.index({ currentLocation: '2dsphere' });
 
-// Performance indexes
-ResponderStatusSchema.index({ status: 1 });
-ResponderStatusSchema.index({ isAvailable: 1 });
+// Compound index for common queries
+ResponderStatusSchema.index({ responderId: 1 }); // Added for responder lookups
+ResponderStatusSchema.index({ status: 1, isAvailable: 1 }); // Combined index for status + availability
+ResponderStatusSchema.index({ currentIncidentId: 1 }); // For finding responders by incident
 
 /* ============================================================
    MODEL

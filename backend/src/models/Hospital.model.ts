@@ -33,8 +33,8 @@ const HospitalStatsSchema = new Schema<IHospitalStats>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true,
-      index: true
+      unique: true  // This creates the index automatically
+      // REMOVED: index: true - handled by unique:true
     },
 
     totalIncidents: {
@@ -44,8 +44,8 @@ const HospitalStatsSchema = new Schema<IHospitalStats>(
 
     activeIncidents: {
       type: Number,
-      default: 0,
-      index: true
+      default: 0
+      // REMOVED: index: true - index added in INDEXES section
     },
 
     resolvedIncidents: {
@@ -87,9 +87,14 @@ const HospitalStatsSchema = new Schema<IHospitalStats>(
    INDEXES
 ============================================================ */
 
-HospitalStatsSchema.index({ hospitalId: 1 });
+// All indexes defined here (single source of truth)
+// REMOVED: HospitalStatsSchema.index({ hospitalId: 1 }, { unique: true }); 
+// The unique index is already created by unique:true in the field definition
+
+// Additional performance indexes
 HospitalStatsSchema.index({ activeIncidents: 1 });
 HospitalStatsSchema.index({ availableBeds: 1 });
+HospitalStatsSchema.index({ lastUpdated: -1 }); // Added for sorting by last updated
 
 /* ============================================================
    MIDDLEWARE

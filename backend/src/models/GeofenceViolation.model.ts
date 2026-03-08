@@ -21,14 +21,14 @@ const GeofenceViolationSchema = new Schema<IGeofenceViolation>(
     geofenceId: { 
       type: Schema.Types.ObjectId, 
       ref: 'Geofence', 
-      required: true,
-      index: true 
+      required: true
+      // REMOVED: index: true (handled by schema.index below)
     },
     driverId: { 
       type: Schema.Types.ObjectId, 
       ref: 'User', 
-      required: true,
-      index: true 
+      required: true
+      // REMOVED: index: true (handled by schema.index below)
     },
     type: { 
       type: String, 
@@ -56,8 +56,10 @@ const GeofenceViolationSchema = new Schema<IGeofenceViolation>(
   { timestamps: true }
 );
 
-// Create indexes for efficient querying
+// Create indexes for efficient querying (single source of truth)
 GeofenceViolationSchema.index({ geofenceId: 1, driverId: 1, timestamp: -1 });
 GeofenceViolationSchema.index({ location: '2dsphere' });
+GeofenceViolationSchema.index({ timestamp: -1 }); // Optional: for time-based queries
+GeofenceViolationSchema.index({ resolved: 1 }); // Optional: for filtering resolved/unresolved
 
 export const GeofenceViolation = mongoose.model<IGeofenceViolation>('GeofenceViolation', GeofenceViolationSchema);

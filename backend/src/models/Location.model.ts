@@ -66,7 +66,7 @@ const LocationSchema = new Schema<ILocationDocument>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
+      // REMOVED: index: true (handled by schema.index below)
     },
 
     driverName: {
@@ -121,14 +121,14 @@ const LocationSchema = new Schema<ILocationDocument>(
     timestamp: {
       type: Date,
       default: Date.now,
-      index: true,
+      // REMOVED: index: true (handled by schema.index below)
     },
 
     status: {
       type: String,
       enum: ['driving', 'idle', 'stopped', 'emergency'],
       default: 'driving',
-      index: true,
+      // REMOVED: index: true (handled by schema.index below)
     },
   },
   {

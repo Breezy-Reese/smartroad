@@ -49,6 +49,7 @@ export interface IUserDocument extends Document {
   // Methods
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
+
 /* ============================================================
    SUB SCHEMAS
 ============================================================ */
@@ -102,7 +103,7 @@ const UserSchema = new Schema<IUserDocument>(
     email: { 
       type: String, 
       required: [true, 'Email is required'], 
-      unique: true, 
+      unique: true,  // This creates an index automatically
       lowercase: true,
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address']
@@ -151,7 +152,7 @@ const UserSchema = new Schema<IUserDocument>(
       type: String, 
       trim: true,
       sparse: true,
-      unique: true,
+      unique: true,  // This creates an index automatically
       match: [/^[A-Z0-9-]+$/, 'Invalid license number format']
     },
     licenseExpiry: { type: Date },
@@ -180,46 +181,43 @@ const UserSchema = new Schema<IUserDocument>(
     certifications: { type: [String], default: [] },
     experience: { type: Number, default: 0, min: 0 },
   },
- {
-  timestamps: true,
-  toJSON: {
-    transform: (_doc: IUserDocument, ret: Record<string, any>) => {
-      delete ret.password;
-      delete ret.refreshToken;
-      delete ret.emailVerificationToken;
-      delete ret.passwordResetToken;
-      delete ret.passwordResetExpires;
-      delete ret.__v;
-      
-      if (ret._id) ret._id = ret._id.toString();
-      if (ret.vehicleId) ret.vehicleId = ret.vehicleId.toString();
-      if (ret.hospitalId) ret.hospitalId = ret.hospitalId.toString();
-      if (ret.currentIncidentId) ret.currentIncidentId = ret.currentIncidentId.toString();
-      
-      return ret;
+  {
+    timestamps: true,
+    toJSON: {
+      transform: (_doc: IUserDocument, ret: Record<string, any>) => {
+        delete ret.password;
+        delete ret.refreshToken;
+        delete ret.emailVerificationToken;
+        delete ret.passwordResetToken;
+        delete ret.passwordResetExpires;
+        delete ret.__v;
+        
+        if (ret._id) ret._id = ret._id.toString();
+        if (ret.vehicleId) ret.vehicleId = ret.vehicleId.toString();
+        if (ret.hospitalId) ret.hospitalId = ret.hospitalId.toString();
+        if (ret.currentIncidentId) ret.currentIncidentId = ret.currentIncidentId.toString();
+        
+        return ret;
+      },
     },
-  },
-}
+  }
 );
+
+/* ============================================================
+   INDEXES
+============================================================ */
 // Compound index for role + active status
 UserSchema.index({ role: 1, isActive: 1 });
 
-// Unique indexes
-UserSchema.index({ email: 1 }, { 
-  unique: true,
-  background: true 
-});
+// REMOVED: Duplicate email index (already created by unique:true in schema)
+// UserSchema.index({ email: 1 }, { unique: true, background: true });
 
 UserSchema.index({ phone: 1 }, { 
   background: true 
 });
 
-// Sparse unique index for optional license number
-UserSchema.index({ licenseNumber: 1 }, { 
-  sparse: true, 
-  unique: true,
-  background: true 
-});
+// REMOVED: Duplicate licenseNumber index (already created by unique:true in schema)
+// UserSchema.index({ licenseNumber: 1 }, { sparse: true, unique: true, background: true });
 
 // Geospatial indexes for location queries
 UserSchema.index({ 

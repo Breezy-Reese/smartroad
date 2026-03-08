@@ -74,15 +74,13 @@ if (activeIncident) {
   // Notify responders
   if (activeIncident.responders?.length) {
     for (const responder of activeIncident.responders) {
-      if (!responder?.id || responder.status !== 'en-route' || !responder.location) continue;
-
+if (!responder?.responderId || responder.status !== 'en-route' || !responder.location) continue;
       const eta = locationService.calculateETA(
         { lat: latitude, lng: longitude },
         responder.location
       );
 
-      io?.to(`responder-${responder.id}`).emit('driver-location-update', {
-        incidentId: activeIncident._id,
+io?.to(`responder-${responder.responderId}`).emit('driver-location-update', {        incidentId: activeIncident._id,
         location: { lat: latitude, lng: longitude },
         eta
       });
