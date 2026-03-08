@@ -103,7 +103,7 @@ export const initializeSocket = (server: HttpServer) => {
         });
 
         // Update in Redis
-        redisClient.setex(
+        redisClient.setEx(
           `driver:location:${userId}`,
           30, // 30 seconds TTL
           JSON.stringify(data)
@@ -135,7 +135,7 @@ export const initializeSocket = (server: HttpServer) => {
         });
 
         // Store in Redis
-        await redisClient.setex(
+        await redisClient.setEx(
           `panic:${userId}`,
           300, // 5 minutes
           JSON.stringify(data)

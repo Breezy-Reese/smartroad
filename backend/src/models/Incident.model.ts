@@ -1,42 +1,160 @@
-import mongoose, { Schema, Document } from "mongoose";
-import { Incident, IResponderInfo, IEmergencyContact } from "../types/incident.types";
-import { IUser } from "../types";
+import mongoose, { Schema, Document, Types, Model } from "mongoose";
 
-export interface IUserDocument extends Document, IUser {}
+/* ============================================================
+   TYPES
+============================================================ */
 
-const CoordinatesSchema = new Schema(
+export type IncidentType =
+  | "collision"
+  | "rollover"
+  | "fire"
+  | "medical"
+  | "other";
+
+export type IncidentSeverity =
+  | "low"
+  | "medium"
+  | "high"
+  | "critical"
+  | "fatal";
+
+export type IncidentStatus =
+  | "pending"
+  | "detected"
+  | "confirmed"
+  | "dispatched"
+  | "en-route"
+  | "arrived"
+  | "treating"
+  | "transporting"
+  | "resolved"
+  | "cancelled"
+  | "false-alarm";
+
+export type ResponderStatus =
+  | "dispatched"
+  | "en-route"
+  | "arrived"
+  | "treating"
+  | "transporting"
+  | "completed";
+
+export type ResponderType =
+  | "ambulance"
+  | "police"
+  | "fire"
+  | "rescue";
+
+/* ============================================================
+   GEO LOCATION
+============================================================ */
+
+export interface IGeoLocation {
+  lng: any;
+  lat: any;
+  type: "Point";
+  coordinates: [number, number]; // [lng, lat]
+}
+
+const GeoLocationSchema = new Schema<IGeoLocation>(
   {
-    lat: { type: Number, required: true },
-    lng: { type: Number, required: true }
+    type: {
+      type: String,
+      enum: ["Point"],
+      default: "Point",
+      required: true
+    },
+    coordinates: {
+      type: [Number],
+      required: true
+    }
   },
   { _id: false }
 );
 
+/* ============================================================
+   RESPONDER
+============================================================ */
+
+export interface IResponderInfo {
+  id: any;
+  responderId: Types.ObjectId;
+  name: string;
+  type: ResponderType;
+  hospital?: string;
+  eta: number;
+  distance: number;
+  status: ResponderStatus;
+  location?: {
+    lat: number;
+    lng: number;
+  };
+  contactNumber?: string;
+  dispatchedAt?: Date;
+  arrivedAt?: Date;
+  completedAt?: Date;
+}
+
 const ResponderSchema = new Schema<IResponderInfo>(
   {
-    id: { type: String, required: true },
+    responderId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    },
+
     name: { type: String, required: true },
+
     type: {
       type: String,
       enum: ["ambulance", "police", "fire", "rescue"],
       required: true
     },
-    hospital: { type: String },
+
+    hospital: String,
+
     eta: { type: Number, required: true },
     distance: { type: Number, required: true },
+
     status: {
       type: String,
-      enum: ["dispatched", "en-route", "arrived", "treating", "transporting", "completed"],
+      enum: [
+        "dispatched",
+        "en-route",
+        "arrived",
+        "treating",
+        "transporting",
+        "completed"
+      ],
       default: "dispatched"
     },
-    location: CoordinatesSchema,
+
+    location: {
+      lat: Number,
+      lng: Number
+    },
+
     contactNumber: String,
+
     dispatchedAt: { type: Date, default: Date.now },
     arrivedAt: Date,
     completedAt: Date
   },
   { _id: false }
 );
+
+/* ============================================================
+   EMERGENCY CONTACT
+============================================================ */
+
+export interface IEmergencyContact {
+  name: string;
+  relationship: string;
+  phone: string;
+  email?: string;
+  isNotified?: boolean;
+  notifiedAt?: Date;
+}
 
 const EmergencyContactSchema = new Schema<IEmergencyContact>(
   {
@@ -50,11 +168,74 @@ const EmergencyContactSchema = new Schema<IEmergencyContact>(
   { _id: false }
 );
 
+/* ============================================================
+   INCIDENT DOCUMENT
+============================================================ */
+
+export interface IncidentDocument extends Document {
+  incidentId: string;
+
+  driverId: Types.ObjectId;
+  driverName: string;
+  driverPhone?: string;
+
+  type: IncidentType;
+  severity: IncidentSeverity;
+  status: IncidentStatus;
+
+  location: IGeoLocation;
+  locationAddress?: string;
+
+  timestamp: Date;
+  detectedAt: Date;
+  confirmedAt?: Date;
+  resolvedAt?: Date;
+
+  speed?: number;
+  impactForce?: number;
+  airbagDeployed?: boolean;
+  occupants?: number;
+  injuries?: number;
+  fatalities?: number;
+
+  vehicleId?: string;
+  vehicleNumber?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
+
+  images?: string[];
+  videos?: string[];
+
+  responders: IResponderInfo[];
+  emergencyContacts: IEmergencyContact[];
+
+  hospitalId?: Types.ObjectId;
+  assignedAmbulance?: string;
+  assignedHospital?: string;
+
+  createdBy?: string;
+  updatedBy?: string;
+
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/* ============================================================
+   INCIDENT SCHEMA
+============================================================ */
+
 const IncidentSchema = new Schema<IncidentDocument>(
   {
     incidentId: { type: String, required: true, unique: true },
 
-    driverId: { type: String, required: true },
+    driverId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true
+    },
+
     driverName: { type: String, required: true },
     driverPhone: String,
 
@@ -85,10 +266,14 @@ const IncidentSchema = new Schema<IncidentDocument>(
         "cancelled",
         "false-alarm"
       ],
-      default: "pending"
+      default: "pending",
+      index: true
     },
 
-    location: { type: CoordinatesSchema, required: true },
+    location: {
+      type: GeoLocationSchema,
+      required: true
+    },
 
     locationAddress: String,
 
@@ -117,7 +302,11 @@ const IncidentSchema = new Schema<IncidentDocument>(
     responders: [ResponderSchema],
     emergencyContacts: [EmergencyContactSchema],
 
-    hospitalId: String,
+    hospitalId: {
+      type: Schema.Types.ObjectId,
+      ref: "User"
+    },
+
     assignedAmbulance: String,
     assignedHospital: String,
 
@@ -127,7 +316,18 @@ const IncidentSchema = new Schema<IncidentDocument>(
   { timestamps: true }
 );
 
-export const Incident = mongoose.model<IncidentDocument>(
-  "Incident",
-  IncidentSchema
-);
+/* ============================================================
+   INDEXES
+============================================================ */
+
+IncidentSchema.index({ location: "2dsphere" });
+IncidentSchema.index({ timestamp: -1 });
+IncidentSchema.index({ severity: 1 });
+IncidentSchema.index({ status: 1 });
+
+/* ============================================================
+   MODEL
+============================================================ */
+
+export const Incident: Model<IncidentDocument> =
+  mongoose.model<IncidentDocument>("Incident", IncidentSchema);

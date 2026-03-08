@@ -1,27 +1,50 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
 
-export const requestLogger = (req: Request, res: Response, next: NextFunction) => {
+/* ============================================================
+   REQUEST LOGGER (HTTP LOGS)
+============================================================ */
+
+export const requestLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   const start = Date.now();
 
   res.on('finish', () => {
     const duration = Date.now() - start;
-    const message = `${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`;
+
+    const logData = {
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      duration: `${duration}ms`,
+    };
 
     if (res.statusCode >= 500) {
-      logger.error(message);
+      logger.error(logData);
     } else if (res.statusCode >= 400) {
-      logger.warn(message);
+      logger.warn(logData);
     } else {
-      logger.info(message);
+      logger.info(logData);
     }
   });
 
   next();
 };
 
-export const requestDetails = (req: Request, _res: Response, next: NextFunction) => {
-  logger.debug('Request details:', {
+/* ============================================================
+   REQUEST DETAILS LOGGER (DEBUG MODE)
+============================================================ */
+
+export const requestDetails = (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+) => {
+  logger.debug({
+    message: 'Request details',
     method: req.method,
     url: req.originalUrl,
     ip: req.ip,

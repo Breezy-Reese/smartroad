@@ -1,86 +1,66 @@
 import { io } from '../utils/socket';
 import { sendSMS } from './sms.service';
-import { sendEmail } from './email.service';
-import { Incident } from '../types/incident.types';
-import { IEmergencyContact } from '../types/user.types';
+import { emailService } from './email.service';
 import { logger } from '../utils/logger';
 
+import { IncidentDocument } from '../types/incident.types';
+import { IEmergencyContact } from '../types/user.types';
+
 class NotificationService {
-  sendSMS(_arg0: { to: any; message: string; }) {
+  sendEmergencySMS(arg0: { to: string; message: string; }) {
     throw new Error('Method not implemented.');
   }
+  // ================= EMERGENCY CONTACTS =================
+
   async notifyEmergencyContacts(
     contacts: IEmergencyContact[],
-    incident: Incident
+    incident: IncidentDocument
   ): Promise<void> {
     const message = this.formatEmergencyMessage(incident);
 
     for (const contact of contacts) {
       try {
-        // Send SMS
         if (contact.phone) {
           await sendSMS({
             to: contact.phone,
-            message: `EMERGENCY ALERT: ${message}`,
+            message: `🚨 EMERGENCY: ${message}`,
           });
         }
 
-        // Send Email
         if (contact.email) {
-          await sendEmail({
+          await emailService.sendEmail({
             to: contact.email,
-            subject: '🚨 Emergency Alert - Your Contact Needs Help',
+            subject: '🚨 Emergency Alert - Immediate Attention Required',
             template: 'emergency-contact',
             data: {
               contactName: contact.name,
               driverName: incident.driverName,
-              location: incident.locationAddress || `${incident.location.lat}, ${incident.location.lng}`,
+              location:
+                incident.locationAddress ||
+                `${incident.location.lat}, ${incident.location.lng}`,
               severity: incident.severity,
-              time: new Date(incident.timestamp).toLocaleString(),
               incidentId: incident.incidentId,
+              time: new Date(incident.timestamp).toLocaleString(),
             },
           });
         }
 
-        // Mark as notified
         contact.isNotified = true;
-        
-        logger.info(`Emergency contact ${contact.name} notified successfully`);
+
+        logger.info(`Notified emergency contact: ${contact.name}`);
       } catch (error) {
-        logger.error(`Failed to notify contact ${contact.name}:`, error);
+        logger.error(`Failed to notify ${contact.name}`, error);
       }
     }
   }
 
-  async sendEmergencySMS(data: { to: string; message: string }): Promise<void> {
-    try {
-      await sendSMS(data);
-      logger.info(`Emergency SMS sent to ${data.to}`);
-    } catch (error) {
-      logger.error('Failed to send emergency SMS:', error);
-    }
-  }
-
-  async sendEmergencyEmail(data: {
-    to: string;
-    subject: string;
-    template: string;
-    data: any;
-  }): Promise<void> {
-    try {
-      await sendEmail(data);
-      logger.info(`Emergency email sent to ${data.to}`);
-    } catch (error) {
-      logger.error('Failed to send emergency email:', error);
-    }
-  }
+  // ================= HOSPITAL NOTIFICATION =================
 
   async notifyHospital(
     hospitalId: string,
-    incident: Incident
+    incident: IncidentDocument
   ): Promise<void> {
     try {
-      // Emit socket event
       io.to(`hospital-${hospitalId}`).emit('emergency-alert', {
         incidentId: incident._id,
         driverName: incident.driverName,
@@ -89,31 +69,35 @@ class NotificationService {
         timestamp: incident.timestamp,
       });
 
-      logger.info(`Hospital ${hospitalId} notified of incident ${incident.incidentId}`);
+      logger.info(`Hospital ${hospitalId} notified`);
     } catch (error) {
-      logger.error('Failed to notify hospital:', error);
+      logger.error('Hospital notification failed', error);
     }
   }
 
+  // ================= RESPONDER NOTIFICATION =================
+
   async notifyResponder(
     responderId: string,
-    incident: Incident,
+    incident: IncidentDocument,
     eta: number
   ): Promise<void> {
     try {
       io.to(`responder-${responderId}`).emit('incident-assigned', {
         incidentId: incident._id,
-        location: incident.location,
         driverName: incident.driverName,
+        location: incident.location,
         severity: incident.severity,
         eta,
       });
 
-      logger.info(`Responder ${responderId} notified of incident ${incident.incidentId}`);
+      logger.info(`Responder ${responderId} notified`);
     } catch (error) {
-      logger.error('Failed to notify responder:', error);
+      logger.error('Responder notification failed', error);
     }
   }
+
+  // ================= DRIVER NOTIFICATION =================
 
   async notifyDriver(
     driverId: string,
@@ -126,18 +110,21 @@ class NotificationService {
         ...data,
         timestamp: new Date(),
       });
+
+      logger.info(`Driver ${driverId} notified`);
     } catch (error) {
-      logger.error('Failed to notify driver:', error);
+      logger.error('Driver notification failed', error);
     }
   }
 
+  // ================= BROADCAST =================
+
   async broadcastToHospitals(
-    incident: Incident,
+    incident: IncidentDocument,
     hospitalIds?: string[]
   ): Promise<void> {
     try {
-      const event = 'emergency-broadcast';
-      const data = {
+      const payload = {
         incidentId: incident._id,
         driverName: incident.driverName,
         location: incident.location,
@@ -145,21 +132,21 @@ class NotificationService {
         timestamp: incident.timestamp,
       };
 
-      if (hospitalIds && hospitalIds.length > 0) {
-        // Broadcast to specific hospitals
-        hospitalIds.forEach(id => {
-          io.to(`hospital-${id}`).emit(event, data);
-        });
+      if (hospitalIds?.length) {
+        hospitalIds.forEach(id =>
+          io.to(`hospital-${id}`).emit('emergency-broadcast', payload)
+        );
       } else {
-        // Broadcast to all hospitals
-        io.emit(event, data);
+        io.emit('emergency-broadcast', payload);
       }
 
-      logger.info(`Emergency broadcast sent for incident ${incident.incidentId}`);
+      logger.info(`Broadcast sent for incident ${incident.incidentId}`);
     } catch (error) {
-      logger.error('Failed to broadcast to hospitals:', error);
+      logger.error('Broadcast failed', error);
     }
   }
+
+  // ================= PANIC BUTTON =================
 
   async sendPanicAlert(
     driverId: string,
@@ -167,9 +154,8 @@ class NotificationService {
     location: { lat: number; lng: number }
   ): Promise<void> {
     try {
-      const message = `PANIC ALERT: ${driverName} has triggered panic button at ${location.lat},${location.lng}`;
+      const message = `PANIC ALERT: ${driverName} triggered panic at ${location.lat},${location.lng}`;
 
-      // Broadcast to all hospitals
       io.emit('panic-alert', {
         driverId,
         driverName,
@@ -177,24 +163,24 @@ class NotificationService {
         timestamp: new Date(),
       });
 
-      // Send SMS to emergency services
-      await this.sendEmergencySMS({
+      await sendSMS({
         to: process.env.EMERGENCY_PHONE_NUMBER || '911',
         message,
       });
 
-      logger.info(`Panic alert sent for driver ${driverName}`);
+      logger.info(`Panic alert sent for ${driverName}`);
     } catch (error) {
-      logger.error('Failed to send panic alert:', error);
+      logger.error('Panic alert failed', error);
     }
   }
 
+  // ================= INCIDENT UPDATE =================
+
   async sendIncidentUpdate(
-    incident: Incident,
+    incident: IncidentDocument,
     updateType: 'status' | 'responder' | 'location'
   ): Promise<void> {
     try {
-      // Notify driver
       if (incident.driverId) {
         io.to(`driver-${incident.driverId}`).emit('incident-update', {
           incidentId: incident._id,
@@ -203,28 +189,40 @@ class NotificationService {
         });
       }
 
-      // Notify hospital
       if (incident.hospitalId) {
-        io.to(`hospital-${incident.hospitalId}`).emit('incident-update', incident);
+        io.to(`hospital-${incident.hospitalId}`).emit(
+          'incident-update',
+          incident
+        );
       }
 
-      // Notify responders
-      incident.responders.forEach((responder: { id: any; }) => {
-        io.to(`responder-${responder.id}`).emit('incident-update', incident);
+      incident.responders?.forEach((responder: any) => {
+        if (responder?.id) {
+          io.to(`responder-${responder.id}`).emit(
+            'incident-update',
+            incident
+          );
+        }
       });
 
       logger.info(`Incident update sent for ${incident.incidentId}`);
     } catch (error) {
-      logger.error('Failed to send incident update:', error);
+      logger.error('Incident update failed', error);
     }
   }
 
-  private formatEmergencyMessage(incident: Incident): string {
+  // ================= HELPERS =================
+
+  private formatEmergencyMessage(incident: IncidentDocument): string {
     const severity = incident.severity.toUpperCase();
-    const location = incident.locationAddress || 
-      `Lat: ${incident.location.lat.toFixed(6)}, Lng: ${incident.location.lng.toFixed(6)}`;
-    
-    return `${incident.driverName} has been in a ${severity} severity accident at ${location}. Immediate assistance required.`;
+
+    const location = incident.locationAddress
+      ? incident.locationAddress
+      : `Lat: ${incident.location.lat.toFixed(
+          6
+        )}, Lng: ${incident.location.lng.toFixed(6)}`;
+
+    return `${incident.driverName} reported a ${severity} accident at ${location}. Immediate response required.`;
   }
 }
 

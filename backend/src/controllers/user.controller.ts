@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import { User } from '../models/User.model';
 import { Location } from '../models/Location.model';
 import { Incident } from '../models/Incident.model';
@@ -8,21 +9,15 @@ import { sendEmail } from '../services/email.service';
 /* ============================================================
    GET USER PROFILE
 ============================================================ */
-
 export const getUserProfile = async (req: Request, res: Response) => {
   try {
-    const userId = req.params.userId || req.user?._id;
+    const userId = req.params.userId || (req as any).user?._id;
 
     const user = await User.findById(userId)
       .select('-refreshToken')
       .populate('vehicleId', 'plateNumber model make');
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found',
-      });
-    }
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
     let stats: any = {};
 
@@ -31,107 +26,58 @@ export const getUserProfile = async (req: Request, res: Response) => {
         Incident.countDocuments({ driverId: user._id }),
         Location.findOne({ driverId: user._id }).sort({ timestamp: -1 }),
       ]);
-
       stats = { totalTrips, lastLocation };
-    }
-
-    if (user.role === 'hospital') {
+    } else if (user.role === 'hospital') {
       const activeIncidents = await Incident.countDocuments({
         hospitalId: user._id,
-        status: {
-          $in: ['dispatched', 'en-route', 'arrived', 'treating'],
-        },
+        status: { $in: ['dispatched', 'en-route', 'arrived', 'treating'] },
       });
-
       stats = { activeIncidents };
     }
 
-    return res.json({
-      success: true,
-      data: {
-        ...user.toJSON(),
-        stats,
-      },
-    });
-  } catch (error) {
+    return res.json({ success: true, data: { ...user.toJSON(), stats } });
+  } catch (error: any) {
     logger.error('Get user profile error', error);
-
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to get profile',
-    });
+    return res.status(500).json({ success: false, error: error.message || 'Failed to get profile' });
   }
 };
 
 /* ============================================================
    UPDATE PROFILE
 ============================================================ */
-
 export const updateUserProfile = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?._id;
-    const updates = req.body;
+    const userId = (req as any).user?._id;
+    if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
 
-    delete updates.password;
-    delete updates.refreshToken;
-    delete updates.role;
-    delete updates.isVerified;
-    delete updates._id;
+    const updates = { ...req.body };
+    ['password', 'refreshToken', 'role', 'isVerified', '_id'].forEach((field) => delete updates[field]);
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { $set: updates },
-      { new: true, runValidators: true }
-    ).select('-refreshToken');
+    const user = await User.findByIdAndUpdate(userId, { $set: updates }, { new: true, runValidators: true })
+      .select('-refreshToken');
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found',
-      });
-    }
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-    return res.json({
-      success: true,
-      message: 'Profile updated',
-      data: user,
-    });
-  } catch (error) {
+    return res.json({ success: true, message: 'Profile updated', data: user });
+  } catch (error: any) {
     logger.error('Update profile error', error);
-
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to update profile',
-    });
+    return res.status(500).json({ success: false, error: error.message || 'Failed to update profile' });
   }
 };
 
 /* ============================================================
    CHANGE PASSWORD
 ============================================================ */
-
 export const changePassword = async (req: Request, res: Response) => {
   try {
+    const userId = (req as any).user?._id;
     const { currentPassword, newPassword } = req.body;
-    const userId = req.user?._id;
 
     const user = await User.findById(userId).select('+password');
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found',
-      });
-    }
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
     const valid = await user.comparePassword(currentPassword);
-
-    if (!valid) {
-      return res.status(401).json({
-        success: false,
-        error: 'Incorrect current password',
-      });
-    }
+    if (!valid) return res.status(401).json({ success: false, error: 'Incorrect current password' });
 
     user.password = newPassword;
     await user.save();
@@ -143,178 +89,83 @@ export const changePassword = async (req: Request, res: Response) => {
       data: { name: user.name },
     });
 
-    return res.json({
-      success: true,
-      message: 'Password changed successfully',
-    });
-  } catch (error) {
+    return res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error: any) {
     logger.error('Change password error', error);
-
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to change password',
-    });
+    return res.status(500).json({ success: false, error: error.message || 'Failed to change password' });
   }
 };
 
 /* ============================================================
    EMERGENCY CONTACTS
 ============================================================ */
-
 export const addEmergencyContact = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?._id;
-    const contactData = req.body;
+    const userId = (req as any).user?._id;
+    const contactData = { ...req.body, _id: crypto.randomUUID() };
 
     const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found',
-      });
-    }
+    if (contactData.isPrimary) user.emergencyContacts?.forEach(c => c.isPrimary = false);
 
-    const contacts = user.emergencyContacts || [];
-
-    contactData._id = crypto.randomUUID();
-
-    if (contactData.isPrimary) {
-      contacts.forEach((c: any) => {
-        c.isPrimary = false;
-      });
-    }
-
-    contacts.push(contactData);
-
-    user.emergencyContacts = contacts;
+    user.emergencyContacts = [...(user.emergencyContacts || []), contactData];
     await user.save();
 
-    return res.json({
-      success: true,
-      message: 'Contact added',
-      data: user.emergencyContacts,
-    });
-  } catch (error) {
+    return res.json({ success: true, message: 'Contact added', data: user.emergencyContacts });
+  } catch (error: any) {
     logger.error('Add emergency contact error', error);
-
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to add contact',
-    });
+    return res.status(500).json({ success: false, error: error.message || 'Failed to add contact' });
   }
 };
 
-/* ============================================================
-   UPDATE CONTACT
-============================================================ */
-
 export const updateEmergencyContact = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?._id;
+    const userId = (req as any).user?._id;
     const { contactId } = req.params;
     const updates = req.body;
 
     const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found',
-      });
-    }
+    const index = (user.emergencyContacts || []).findIndex(c => c._id === contactId);
+    if (index === -1) return res.status(404).json({ success: false, error: 'Contact not found' });
 
-    const index = (user.emergencyContacts || []).findIndex(
-      (c: any) => c._id?.toString() === contactId
-    );
-
-    if (index === -1) {
-      return res.status(404).json({
-        success: false,
-        error: 'Contact not found',
-      });
-    }
-
-    if (updates.isPrimary) {
-      user.emergencyContacts.forEach((c: any) => {
-        c.isPrimary = false;
-      });
-    }
-
-    user.emergencyContacts[index] = {
-      ...user.emergencyContacts[index],
-      ...updates,
-    };
+    if (updates.isPrimary) user.emergencyContacts.forEach(c => c.isPrimary = false);
+    user.emergencyContacts[index] = { ...user.emergencyContacts[index], ...updates };
 
     await user.save();
-
-    return res.json({
-      success: true,
-      message: 'Contact updated',
-      data: user.emergencyContacts,
-    });
-  } catch (error) {
+    return res.json({ success: true, message: 'Contact updated', data: user.emergencyContacts });
+  } catch (error: any) {
     logger.error('Update contact error', error);
-
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to update contact',
-    });
+    return res.status(500).json({ success: false, error: error.message || 'Failed to update contact' });
   }
 };
 
-/* ============================================================
-   DELETE CONTACT
-============================================================ */
-
 export const deleteEmergencyContact = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?._id;
+    const userId = (req as any).user?._id;
     const { contactId } = req.params;
 
     const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found',
-      });
-    }
-
-    user.emergencyContacts = (user.emergencyContacts || []).filter(
-      (c: any) => c._id?.toString() !== contactId
-    );
-
+    user.emergencyContacts = (user.emergencyContacts || []).filter(c => c._id !== contactId);
     await user.save();
 
-    return res.json({
-      success: true,
-      message: 'Contact deleted',
-      data: user.emergencyContacts,
-    });
-  } catch (error) {
+    return res.json({ success: true, message: 'Contact deleted', data: user.emergencyContacts });
+  } catch (error: any) {
     logger.error('Delete contact error', error);
-
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to delete contact',
-    });
+    return res.status(500).json({ success: false, error: error.message || 'Failed to delete contact' });
   }
 };
 
 /* ============================================================
    GET ALL DRIVERS
 ============================================================ */
-
 export const getAllDrivers = async (req: Request, res: Response) => {
   try {
-    const {
-      page = 1,
-      limit = 20,
-      search,
-      status,
-    } = req.query;
-
+    const { page = 1, limit = 20, search, status } = req.query;
     const pageNum = Number(page);
     const limitNum = Number(limit);
 
@@ -330,16 +181,9 @@ export const getAllDrivers = async (req: Request, res: Response) => {
 
     if (status === 'online' || status === 'offline') {
       const recent = await Location.distinct('driverId', {
-        timestamp: {
-          $gte: new Date(Date.now() - 5 * 60 * 1000),
-        },
+        timestamp: { $gte: new Date(Date.now() - 5 * 60 * 1000) },
       });
-
-      if (status === 'online') {
-        query._id = { $in: recent };
-      } else {
-        query._id = { $nin: recent };
-      }
+      query._id = status === 'online' ? { $in: recent } : { $nin: recent };
     }
 
     const drivers = await User.find(query)
@@ -352,14 +196,8 @@ export const getAllDrivers = async (req: Request, res: Response) => {
 
     const data = await Promise.all(
       drivers.map(async (driver) => {
-        const lastLocation = await Location.findOne({
-          driverId: driver._id,
-        }).sort({ timestamp: -1 });
-
-        return {
-          ...driver.toJSON(),
-          lastLocation,
-        };
+        const lastLocation = await Location.findOne({ driverId: driver._id }).sort({ timestamp: -1 });
+        return { ...driver.toJSON(), lastLocation };
       })
     );
 
@@ -367,20 +205,11 @@ export const getAllDrivers = async (req: Request, res: Response) => {
       success: true,
       data: {
         drivers: data,
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total,
-          pages: Math.ceil(total / limitNum),
-        },
+        pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) },
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Get drivers error', error);
-
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to fetch drivers',
-    });
+    return res.status(500).json({ success: false, error: error.message || 'Failed to fetch drivers' });
   }
 };

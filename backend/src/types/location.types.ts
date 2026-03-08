@@ -1,7 +1,12 @@
 import { Document } from 'mongoose';
 import { ICoordinates } from './user.types';
 
-export interface ILocation extends Document {
+/* =========================
+   LOCATION INTERFACES
+========================= */
+
+/** Represents a single driver location report */
+export interface ILocation {
   _id: string;
   driverId: string;
   driverName?: string;
@@ -18,6 +23,7 @@ export interface ILocation extends Document {
   status?: 'driving' | 'idle' | 'stopped' | 'emergency';
 }
 
+/** Payload for updating a driver location */
 export interface ILocationUpdate {
   driverId: string;
   driverName?: string;
@@ -32,23 +38,26 @@ export interface ILocationUpdate {
   status?: 'driving' | 'idle' | 'stopped' | 'emergency';
 }
 
+/** Query parameters for searching nearby users or vehicles */
 export interface INearbyQuery {
   latitude: number;
   longitude: number;
-  radius: number; // in kilometers
+  radius: number; // kilometers
   role?: 'driver' | 'hospital' | 'responder';
 }
 
+/** Result returned from a nearby query */
 export interface INearbyResult {
   id: string;
   name: string;
-  type: string;
+  type: string; // driver, hospital, responder, etc.
   location: ICoordinates;
-  distance: number;
-  bearing?: number;
-  status?: string;
+  distance: number; // in kilometers
+  bearing?: number; // optional heading in degrees
+  status?: string; // optional current status
 }
 
+/** Represents a driver route */
 export interface IRoute extends Document {
   _id: string;
   driverId: string;
@@ -56,20 +65,21 @@ export interface IRoute extends Document {
   startPoint: ICoordinates;
   endPoint?: ICoordinates;
   waypoints: ICoordinates[];
-  distance: number;
-  duration: number;
+  distance: number; // in meters or kilometers
+  duration: number; // in seconds or minutes
   status: 'planned' | 'active' | 'completed' | 'abandoned';
   startedAt?: Date;
   completedAt?: Date;
 }
 
+/** Geofence definition */
 export interface IGeofence extends Document {
   _id: string;
   name: string;
   type: 'circle' | 'polygon';
-  center?: ICoordinates;
-  radius?: number;
-  points?: ICoordinates[];
+  center?: ICoordinates; // for circle
+  radius?: number; // in kilometers, for circle
+  points?: ICoordinates[]; // for polygon
   alertOnEntry: boolean;
   alertOnExit: boolean;
 }

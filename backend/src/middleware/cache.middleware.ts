@@ -4,8 +4,6 @@ import { logger } from '../utils/logger';
 
 export const cache = (duration: number) => {
   return async (req: Request, res: Response, next: NextFunction) => {
-
-    // Only cache GET requests
     if (req.method !== 'GET') {
       return next();
     }
@@ -20,26 +18,24 @@ export const cache = (duration: number) => {
         return res.json(JSON.parse(cachedData));
       }
 
-      // store original json function
       const originalJson = res.json.bind(res);
 
-      // override json to cache response
       res.json = ((body: any) => {
         if (res.statusCode === 200) {
           redisClient
             .setEx(key, duration, JSON.stringify(body))
-            .catch(err => logger.error('Cache set error:', err));
+            .catch((err) => logger.error('Cache set error:', err));
         }
 
         return originalJson(body);
       }) as typeof res.json;
 
       logger.debug(`Cache miss for ${key}`);
-      next();
+      return next();
 
     } catch (error) {
       logger.error('Cache middleware error:', error);
-      next();
+      return next();
     }
   };
 };
@@ -50,15 +46,15 @@ export const clearCache = (pattern: string) => {
       const keys = await redisClient.keys(`cache:${pattern}*`);
 
       if (keys.length > 0) {
-        await redisClient.del(...keys);
+        // ✅ Fix for redis v4 typing
+        await redisClient.del(keys as string[]);
         logger.debug(`Cleared ${keys.length} cache keys matching ${pattern}`);
       }
 
-      next();
-
+      return next();
     } catch (error) {
       logger.error('Clear cache error:', error);
-      next();
+      return next();
     }
   };
 };
@@ -73,6 +69,6 @@ export const getCachedUserData = async (userId: string) => {
 };
 
 export const invalidateUserCache = async (userId: string) => {
-  await redisClient.del(`user:${userId}`);
-  await redisClient.del(`user:${userId}:profile`);
+  await redisClient.del([`user:${userId}`]);
+  await redisClient.del([`user:${userId}:profile`]);
 };

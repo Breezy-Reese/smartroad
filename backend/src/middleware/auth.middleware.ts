@@ -19,66 +19,54 @@ export const authenticate = async (
     const token = req.header('Authorization')?.replace('Bearer ', '');
 
     if (!token) {
-      throw new Error();
+      return res.status(401).json({ success: false, error: 'Please authenticate' });
     }
 
     // Verify token
-    const decoded = jwt.verify(token, appConfig.jwt.secret) as any;
+    const decoded = jwt.verify(token, appConfig.jwt.secret) as { userId: string };
 
     // Check if token is blacklisted
     const isBlacklisted = await redisClient.get(`blacklist:${token}`);
     if (isBlacklisted) {
-      throw new Error();
+      return res.status(401).json({ success: false, error: 'Token is blacklisted' });
     }
 
     // Try to get user from cache
-    let user = await redisClient.get(`user:${decoded.userId}`);
+    let userStr = await redisClient.get(`user:${decoded.userId}`);
     
-    if (!user) {
-      // If not in cache, get from database
-      const dbUser = await User.findById(decoded.userId)
-        .select('-password -refreshToken');
-      
+    if (!userStr) {
+      const dbUser = await User.findById(decoded.userId).select('-password -refreshToken');
       if (!dbUser || !dbUser.isActive) {
-        throw new Error();
+        return res.status(401).json({ success: false, error: 'User not found or inactive' });
       }
 
       // Cache user data
-      user = JSON.stringify(dbUser);
-      await redisClient.setEx(key, 3600, value);
+      userStr = JSON.stringify(dbUser);
+      await redisClient.setEx(`user:${decoded.userId}`, 3600, userStr); // fixed key/value
     }
 
-    req.user = JSON.parse(user);
+    req.user = JSON.parse(userStr);
     req.token = token;
-    
-    next();
+
+    return next();
   } catch (error) {
     logger.warn('Authentication failed:', error);
-    res.status(401).json({
-      success: false,
-      error: 'Please authenticate',
-    });
+    return res.status(401).json({ success: false, error: 'Please authenticate' });
   }
 };
 
 export const authorize = (...roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required',
-      });
+      return res.status(401).json({ success: false, error: 'Authentication required' });
     }
 
     if (!roles.includes(req.user.role)) {
       logger.warn(`Authorization failed: User ${req.user._id} with role ${req.user.role} attempted to access restricted resource`);
-      return res.status(403).json({
-        success: false,
-        error: 'You do not have permission to access this resource',
-      });
+      return res.status(403).json({ success: false, error: 'You do not have permission' });
     }
 
-    next();
+    return next();
   };
 };
 
@@ -89,200 +77,89 @@ export const optionalAuth = async (
 ) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) return next();
 
-    if (!token) {
-      return next();
-    }
+    const decoded = jwt.verify(token, appConfig.jwt.secret) as { userId: string };
+    const user = await User.findById(decoded.userId).select('-password -refreshToken');
+    if (user && user.isActive) req.user = user;
 
-    const decoded = jwt.verify(token, appConfig.jwt.secret) as any;
-    
-    const user = await User.findById(decoded.userId)
-      .select('-password -refreshToken');
-    
-    if (user && user.isActive) {
-      req.user = user;
-    }
-    
-    next();
-  } catch (error) {
-    // Ignore token errors for optional auth
-    next();
+    return next();
+  } catch {
+    return next(); // ignore errors
   }
 };
 
-export const requireDriver = (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  if (!req.user) {
-    return res.status(401).json({
-      success: false,
-      error: 'Authentication required',
-    });
-  }
-
-  if (req.user.role !== 'driver') {
-    return res.status(403).json({
-      success: false,
-      error: 'Driver access required',
-    });
-  }
-
-  next();
+// Role-based access
+export const requireDriver = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'Authentication required' });
+  if (req.user.role !== 'driver') return res.status(403).json({ success: false, error: 'Driver access required' });
+  return next();
 };
 
-export const requireHospital = (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  if (!req.user) {
-    return res.status(401).json({
-      success: false,
-      error: 'Authentication required',
-    });
-  }
-
-  if (req.user.role !== 'hospital') {
-    return res.status(403).json({
-      success: false,
-      error: 'Hospital access required',
-    });
-  }
-
-  next();
+export const requireHospital = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'Authentication required' });
+  if (req.user.role !== 'hospital') return res.status(403).json({ success: false, error: 'Hospital access required' });
+  return next();
 };
 
-export const requireResponder = (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  if (!req.user) {
-    return res.status(401).json({
-      success: false,
-      error: 'Authentication required',
-    });
-  }
-
-  if (req.user.role !== 'responder') {
-    return res.status(403).json({
-      success: false,
-      error: 'Responder access required',
-    });
-  }
-
-  next();
+export const requireResponder = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'Authentication required' });
+  if (req.user.role !== 'responder') return res.status(403).json({ success: false, error: 'Responder access required' });
+  return next();
 };
 
-export const requireAdmin = (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  if (!req.user) {
-    return res.status(401).json({
-      success: false,
-      error: 'Authentication required',
-    });
-  }
-
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({
-      success: false,
-      error: 'Admin access required',
-    });
-  }
-
-  next();
+export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'Authentication required' });
+  if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: 'Admin access required' });
+  return next();
 };
 
 export const checkOwnership = (paramName: string = 'userId') => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required',
-      });
-    }
+    if (!req.user) return res.status(401).json({ success: false, error: 'Authentication required' });
 
     const resourceId = req.params[paramName];
-
-    // Allow if user is admin or owns the resource
-    if (req.user.role === 'admin' || req.user._id.toString() === resourceId) {
-      return next();
-    }
+    if (req.user.role === 'admin' || req.user._id.toString() === resourceId) return next();
 
     logger.warn(`Ownership check failed: User ${req.user._id} attempted to access resource ${resourceId}`);
-    
-    return res.status(403).json({
-      success: false,
-      error: 'You do not have permission to access this resource',
-    });
+    return res.status(403).json({ success: false, error: 'You do not have permission' });
   };
 };
 
+// Logout middleware
 export const logout = async (req: AuthRequest, _res: Response, next: NextFunction) => {
   try {
     const token = req.token;
-    
     if (token) {
-      // Add token to blacklist with expiry matching token's remaining time
       const decoded = jwt.decode(token) as any;
       const expiresIn = decoded.exp - Math.floor(Date.now() / 1000);
-      
-      if (expiresIn > 0) {
-        await redisClient.setEx(`blacklist:${token}`, expiresIn, 'true');
-      }
+      if (expiresIn > 0) await redisClient.setEx(`blacklist:${token}`, expiresIn, 'true');
     }
 
-    // Clear user from cache
-    if (req.user) {
-      await redisClient.del(`user:${req.user._id}`);
-    }
+    if (req.user) await redisClient.del(`user:${req.user._id}`);
 
-    next();
+    return next();
   } catch (error) {
     logger.error('Logout middleware error:', error);
-    next();
+    return next();
   }
 };
 
-export const refreshTokenAuth = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
+// Refresh token middleware
+export const refreshTokenAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(400).json({ success: false, error: 'Refresh token required' });
 
-    if (!refreshToken) {
-      return res.status(400).json({
-        success: false,
-        error: 'Refresh token required',
-      });
-    }
+    const decoded = jwt.verify(refreshToken, appConfig.jwt.refreshSecret) as { userId: string };
 
-    const decoded = jwt.verify(refreshToken, appConfig.jwt.refreshSecret) as any;
-
-    const user = await User.findOne({
-      _id: decoded.userId,
-      refreshToken,
-      isActive: true,
-    });
-
-    if (!user) {
-      throw new Error();
-    }
+    const user = await User.findOne({ _id: decoded.userId, refreshToken, isActive: true });
+    if (!user) return res.status(401).json({ success: false, error: 'Invalid refresh token' });
 
     req.user = user;
-    next();
+    return next();
   } catch (error) {
     logger.warn('Refresh token authentication failed:', error);
-    res.status(401).json({
-      success: false,
-      error: 'Invalid refresh token',
-    });
+    return res.status(401).json({ success: false, error: 'Invalid refresh token' });
   }
 };

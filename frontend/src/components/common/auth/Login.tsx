@@ -104,19 +104,16 @@ const Login: React.FC = () => {
               Forgot password?
             </Link>
           </div>
-
-          {/* SUBMIT */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-emergency-600 text-white py-3 px-4 rounded-xl
-            font-medium hover:bg-emergency-700 transition
-            disabled:opacity-50 disabled:cursor-not-allowed
-            focus:outline-none focus:ring-4 focus:ring-emergency-300"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-
+          {/* SUBMIT BUTTON */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-red-600 text-white py-3 rounded-lg
+          hover:bg-red-700 transition font-medium
+          disabled:opacity-50"
+        >
+          {loading ? 'Signing in...' : 'Sign In'}
+        </button>
         </form>
 
         {/* REGISTER LINK */}

@@ -1,13 +1,17 @@
-import { Router } from 'express';
+import { NextFunction, Router } from 'express';
 import { body } from 'express-validator';
 import * as authController from '../controllers/auth.controller';
-import { authenticate, refreshTokenAuth, logout } from '../middleware/auth.middleware';
+import { authenticate, refreshTokenAuth, logout, AuthRequest } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validation.middleware';
 import { authLimiter } from '../middleware/rateLimiter.middleware';
 
 const router = Router();
 
-// Validation rules
+/* ============================================================
+   VALIDATION RULES
+============================================================ */
+
+// Registration validation
 const registerValidation = [
   body('name')
     .notEmpty().withMessage('Name is required')
@@ -37,6 +41,7 @@ const registerValidation = [
     .notEmpty().withMessage('Hospital name is required'),
 ];
 
+// Login validation
 const loginValidation = [
   body('email')
     .notEmpty().withMessage('Email is required')
@@ -49,6 +54,7 @@ const loginValidation = [
     .isBoolean().withMessage('Remember me must be a boolean'),
 ];
 
+// Forgot password
 const forgotPasswordValidation = [
   body('email')
     .notEmpty().withMessage('Email is required')
@@ -56,6 +62,7 @@ const forgotPasswordValidation = [
     .normalizeEmail(),
 ];
 
+// Reset password
 const resetPasswordValidation = [
   body('token')
     .notEmpty().withMessage('Token is required'),
@@ -67,6 +74,7 @@ const resetPasswordValidation = [
     .matches(/[0-9]/).withMessage('Password must contain at least one number'),
 ];
 
+// Change password
 const changePasswordValidation = [
   body('currentPassword')
     .notEmpty().withMessage('Current password is required'),
@@ -78,7 +86,9 @@ const changePasswordValidation = [
     .matches(/[0-9]/).withMessage('Password must contain at least one number'),
 ];
 
-// Public routes (with rate limiting)
+/* ============================================================
+   PUBLIC ROUTES
+============================================================ */
 router.post('/register', authLimiter, validate(registerValidation), authController.register);
 router.post('/login', authLimiter, validate(loginValidation), authController.login);
 router.post('/refresh-token', authLimiter, refreshTokenAuth, authController.refreshToken);
@@ -86,7 +96,9 @@ router.post('/forgot-password', authLimiter, validate(forgotPasswordValidation),
 router.post('/reset-password', authLimiter, validate(resetPasswordValidation), authController.resetPassword);
 router.get('/verify-email/:token', authLimiter, authController.verifyEmail);
 
-// Protected routes
+/* ============================================================
+   PROTECTED ROUTES
+============================================================ */
 router.post('/logout', authenticate, logout, authController.logout);
 router.get('/me', authenticate, authController.getMe);
 router.post('/change-password', authenticate, validate(changePasswordValidation), authController.changePassword);

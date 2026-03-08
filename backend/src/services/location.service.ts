@@ -1,62 +1,76 @@
 import { ICoordinates } from '../types/user.types';
 
+export interface INearestPoint extends ICoordinates {
+  id: string;
+  name?: string;
+  distance: number;
+}
+
 class LocationService {
-  // Calculate distance between two points in kilometers (Haversine formula)
+  // ================= DISTANCE =================
+
   calculateDistance(point1: ICoordinates, point2: ICoordinates): number {
-    const R = 6371; // Earth's radius in km
+    const R = 6371; // Earth radius in km
+
     const dLat = this.toRad(point2.lat - point1.lat);
-    const dLon = this.toRad(point2.lng - point1.lng);
+    const dLng = this.toRad(point2.lng - point1.lng);
+
     const lat1 = this.toRad(point1.lat);
     const lat2 = this.toRad(point2.lat);
 
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    
+
     return R * c;
   }
 
-  // Calculate ETA in minutes based on distance and average speed
+  // ================= ETA =================
+
   calculateETA(
     origin: ICoordinates,
     destination: ICoordinates,
-    averageSpeed: number = 40 // km/h
+    averageSpeedKmH = 40
   ): number {
     const distance = this.calculateDistance(origin, destination);
-    const timeHours = distance / averageSpeed;
-    return Math.ceil(timeHours * 60); // Convert to minutes
+
+    if (averageSpeedKmH <= 0) return 0;
+
+    const hours = distance / averageSpeedKmH;
+
+    return Math.ceil(hours * 60); // minutes
   }
 
-  // Calculate bearing between two points
+  // ================= BEARING =================
+
   calculateBearing(point1: ICoordinates, point2: ICoordinates): number {
     const lat1 = this.toRad(point1.lat);
     const lat2 = this.toRad(point2.lat);
-    const dLon = this.toRad(point2.lng - point1.lng);
+    const dLng = this.toRad(point2.lng - point1.lng);
 
-    const y = Math.sin(dLon) * Math.cos(lat2);
-    const x = Math.cos(lat1) * Math.sin(lat2) -
-      Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    const y = Math.sin(dLng) * Math.cos(lat2);
+    const x =
+      Math.cos(lat1) * Math.sin(lat2) -
+      Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
 
-    let bearing = Math.atan2(y, x);
-    bearing = this.toDeg(bearing);
-    bearing = (bearing + 360) % 360; // Normalize to 0-360
-
-    return bearing;
+    let bearing = this.toDeg(Math.atan2(y, x));
+    return (bearing + 360) % 360;
   }
 
-  // Get cardinal direction from bearing
   getCardinalDirection(bearing: number): string {
     const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-    const index = Math.round(bearing / 45) % 8;
-    return directions[index];
+    return directions[Math.round(bearing / 45) % 8];
   }
 
-  // Calculate midpoint between two points
-  calculateMidpoint(point1: ICoordinates, point2: ICoordinates): ICoordinates {
-    const lat1 = this.toRad(point1.lat);
-    const lon1 = this.toRad(point1.lng);
-    const lat2 = this.toRad(point2.lat);
-    const lon2 = this.toRad(point2.lng);
+  // ================= GEOMETRY =================
+
+  calculateMidpoint(p1: ICoordinates, p2: ICoordinates): ICoordinates {
+    const lat1 = this.toRad(p1.lat);
+    const lon1 = this.toRad(p1.lng);
+    const lat2 = this.toRad(p2.lat);
+    const lon2 = this.toRad(p2.lng);
 
     const dLon = lon2 - lon1;
 
@@ -65,8 +79,11 @@ class LocationService {
 
     const lat3 = Math.atan2(
       Math.sin(lat1) + Math.sin(lat2),
-      Math.sqrt((Math.cos(lat1) + Bx) * (Math.cos(lat1) + Bx) + By * By)
+      Math.sqrt(
+        (Math.cos(lat1) + Bx) ** 2 + By ** 2
+      )
     );
+
     const lon3 = lon1 + Math.atan2(By, Math.cos(lat1) + Bx);
 
     return {
@@ -75,45 +92,40 @@ class LocationService {
     };
   }
 
-  // Check if a point is within a radius of another point
+  // ================= RADIUS CHECK =================
+
   isWithinRadius(
     center: ICoordinates,
     point: ICoordinates,
     radiusKm: number
   ): boolean {
-    const distance = this.calculateDistance(center, point);
-    return distance <= radiusKm;
+    return this.calculateDistance(center, point) <= radiusKm;
   }
 
-  // Get bounding box coordinates for a radius around a point
-  getBoundingBox(
-    center: ICoordinates,
-    radiusKm: number
-  ): {
-    northEast: ICoordinates;
-    southWest: ICoordinates;
-  } {
-    const latChange = radiusKm / 111; // 1 degree lat ≈ 111 km
-    const lngChange = radiusKm / (111 * Math.cos(this.toRad(center.lat)));
+  getBoundingBox(center: ICoordinates, radiusKm: number) {
+    const latDelta = radiusKm / 111;
+    const lngDelta =
+      radiusKm / (111 * Math.cos(this.toRad(center.lat)));
 
     return {
       northEast: {
-        lat: center.lat + latChange,
-        lng: center.lng + lngChange,
+        lat: center.lat + latDelta,
+        lng: center.lng + lngDelta,
       },
       southWest: {
-        lat: center.lat - latChange,
-        lng: center.lng - lngChange,
+        lat: center.lat - latDelta,
+        lng: center.lng - lngDelta,
       },
     };
   }
 
-  // Find nearest point from a list of points
+  // ================= SEARCH HELPERS =================
+
   findNearestPoint(
     origin: ICoordinates,
     points: Array<ICoordinates & { id: string; name?: string }>
-  ): (ICoordinates & { id: string; name?: string; distance: number }) | null {
-    if (points.length === 0) return null;
+  ): INearestPoint | null {
+    if (!points.length) return null;
 
     let nearest = points[0];
     let minDistance = this.calculateDistance(origin, nearest);
@@ -132,7 +144,6 @@ class LocationService {
     };
   }
 
-  // Filter points within radius
   filterPointsWithinRadius(
     origin: ICoordinates,
     points: Array<ICoordinates & { id: string }>,
@@ -147,93 +158,105 @@ class LocationService {
       .sort((a, b) => a.distance - b.distance);
   }
 
-  // Calculate route distance from array of points
+  // ================= ROUTE CALCULATION =================
+
   calculateRouteDistance(points: ICoordinates[]): number {
-    let totalDistance = 0;
+    let total = 0;
+
     for (let i = 0; i < points.length - 1; i++) {
-      totalDistance += this.calculateDistance(points[i], points[i + 1]);
+      total += this.calculateDistance(points[i], points[i + 1]);
     }
-    return totalDistance;
+
+    return total;
   }
 
-  // Calculate center point of multiple coordinates
   calculateCenterPoint(points: ICoordinates[]): ICoordinates {
-    if (points.length === 0) {
-      return { lat: 0, lng: 0 };
-    }
+    if (!points.length) return { lat: 0, lng: 0 };
 
-    let sumLat = 0;
-    let sumLng = 0;
-
-    points.forEach(point => {
-      sumLat += point.lat;
-      sumLng += point.lng;
-    });
+    const sum = points.reduce(
+      (acc, p) => {
+        acc.lat += p.lat;
+        acc.lng += p.lng;
+        return acc;
+      },
+      { lat: 0, lng: 0 }
+    );
 
     return {
-      lat: sumLat / points.length,
-      lng: sumLng / points.length,
+      lat: sum.lat / points.length,
+      lng: sum.lng / points.length,
     };
   }
 
-  // Find nearby hospitals (simulated - would use database query with geospatial index)
+  // ================= DATABASE STUBS =================
+
   async findNearbyHospitals(
     _location: ICoordinates,
-    _radiusKm: number = 10
+    _radiusKm = 10
   ): Promise<any[]> {
-    // This would be implemented with actual database query
-    // For now, return empty array
+    // Replace with MongoDB geospatial query
     return [];
   }
 
-  // Find nearby responders (simulated - would use database query with geospatial index)
   async findNearbyResponders(
     _location: ICoordinates,
-    _radiusKm: number = 5
+    _radiusKm = 5
   ): Promise<any[]> {
-    // This would be implemented with actual database query
-    // For now, return empty array
+    // Replace with real DB query later
     return [];
   }
 
-  // Check if point is within geofence (polygon)
-  isPointInPolygon(point: ICoordinates, polygon: ICoordinates[]): boolean {
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const xi = polygon[i].lng, yi = polygon[i].lat;
-      const xj = polygon[j].lng, yj = polygon[j].lat;
+  // ================= GEOFENCE =================
 
-      const intersect = ((yi > point.lat) !== (yj > point.lat)) &&
-        (point.lng < (xj - xi) * (point.lat - yi) / (yj - yi) + xi);
+  isPointInPolygon(
+    point: ICoordinates,
+    polygon: ICoordinates[]
+  ): boolean {
+    let inside = false;
+
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].lng;
+      const yi = polygon[i].lat;
+      const xj = polygon[j].lng;
+      const yj = polygon[j].lat;
+
+      const intersect =
+        yi > point.lat !== yj > point.lat &&
+        point.lng <
+          ((xj - xi) * (point.lat - yi)) / (yj - yi + 0.0000001) +
+            xi;
+
       if (intersect) inside = !inside;
     }
+
     return inside;
   }
 
-  // Generate random point within radius (for testing)
+  // ================= TEST UTIL =================
+
   generateRandomPoint(center: ICoordinates, radiusKm: number): ICoordinates {
-    const radiusInDegrees = radiusKm / 111; // Convert km to degrees
+    const radiusDeg = radiusKm / 111;
+
     const u = Math.random();
     const v = Math.random();
-    const w = radiusInDegrees * Math.sqrt(u);
+
+    const w = radiusDeg * Math.sqrt(u);
     const t = 2 * Math.PI * v;
-    const x = w * Math.cos(t);
-    const y = w * Math.sin(t);
 
     return {
-      lat: center.lat + y,
-      lng: center.lng + x,
+      lat: center.lat + w * Math.cos(t),
+      lng: center.lng + w * Math.sin(t),
     };
   }
 
-  // Convert degrees to radians
-  private toRad(degrees: number): number {
-    return degrees * Math.PI / 180;
+  // ================= UTIL CONVERTERS =================
+
+  private toRad(deg: number): number {
+    return (deg * Math.PI) / 180;
   }
 
-  // Convert radians to degrees
-  private toDeg(radians: number): number {
-    return radians * 180 / Math.PI;
+  private toDeg(rad: number): number {
+    return (rad * 180) / Math.PI;
   }
 }
 

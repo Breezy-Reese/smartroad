@@ -1,12 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
 
+/* =========================
+   CUSTOM APP ERROR
+========================= */
+
 export class AppError extends Error {
   statusCode: number;
   isOperational: boolean;
 
   constructor(message: string, statusCode: number) {
     super(message);
+
     this.statusCode = statusCode;
     this.isOperational = true;
 
@@ -14,16 +19,23 @@ export class AppError extends Error {
   }
 }
 
+/* =========================
+   ERROR HANDLER
+========================= */
+
 export const errorHandler = (
-  err: Error | AppError,
+  err: any,
   req: Request,
   res: Response,
   _next: NextFunction
 ) => {
-  let error = { ...err };
-  error.message = err.message;
+  let error = err;
 
-  // Log error
+  // Convert non-AppError into AppError
+  if (!(error instanceof AppError)) {
+    error = new AppError(error.message || 'Internal Server Error', error.statusCode || 500);
+  }
+
   logger.error(`${req.method} ${req.path} - ${error.message}`, {
     stack: err.stack,
     body: req.body,
@@ -32,55 +44,64 @@ export const errorHandler = (
     user: (req as any).user?._id,
   });
 
-  // Mongoose bad ObjectId
+  // Mongoose CastError
   if (err.name === 'CastError') {
-    const message = 'Resource not found';
-    error = new AppError(message, 404);
+    error = new AppError('Resource not found', 404);
   }
 
-  // Mongoose duplicate key
-  if ((err as any).code === 11000) {
-    const field = Object.keys((err as any).keyPattern)[0];
-    const message = `Duplicate field value: ${field}. Please use another value`;
-    error = new AppError(message, 400);
+  // Duplicate key
+  if ((err as any)?.code === 11000) {
+    const field = Object.keys((err as any).keyPattern || {})[0];
+    error = new AppError(
+      `Duplicate field value: ${field}. Please use another value`,
+      400
+    );
   }
 
-  // Mongoose validation error
+  // Validation error
   if (err.name === 'ValidationError') {
-    const errors = Object.values((err as any).errors).map((e: any) => e.message);
-    const message = `Validation error: ${errors.join('. ')}`;
-    error = new AppError(message, 400);
+    const errors = Object.values((err as any).errors || {}).map(
+      (e: any) => e.message
+    );
+    error = new AppError(`Validation error: ${errors.join('. ')}`, 400);
   }
 
-  // JWT errors
+  // JWT Errors
   if (err.name === 'JsonWebTokenError') {
-    const message = 'Invalid token. Please log in again';
-    error = new AppError(message, 401);
+    error = new AppError('Invalid token. Please log in again', 401);
   }
 
   if (err.name === 'TokenExpiredError') {
-    const message = 'Your token has expired. Please log in again';
-    error = new AppError(message, 401);
+    error = new AppError('Your token has expired. Please log in again', 401);
   }
 
-  // Send response
-  const statusCode = (error as AppError).statusCode || 500;
-  const isOperational = (error as AppError).isOperational || false;
-
-  res.status(statusCode).json({
+  res.status(error.statusCode || 500).json({
     success: false,
     error: error.message,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-    ...(isOperational && { code: statusCode }),
+    ...(error.isOperational && { code: error.statusCode }),
   });
 };
 
-export const notFound = (req: Request, _res: Response, next: NextFunction) => {
-  const error = new AppError(`Not found - ${req.originalUrl}`, 404);
-  next(error);
+/* =========================
+   404 HANDLER
+========================= */
+
+export const notFound = (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+) => {
+  next(new AppError(`Not found - ${req.originalUrl}`, 404));
 };
 
-export const catchAsync = (fn: Function) => {
+/* =========================
+   SAFE CATCH ASYNC
+========================= */
+
+export const catchAsync = <T>(
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<T>
+) => {
   return (req: Request, res: Response, next: NextFunction) => {
     fn(req, res, next).catch(next);
   };
