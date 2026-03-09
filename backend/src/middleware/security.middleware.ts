@@ -16,7 +16,9 @@ export const securityHeaders = helmet({
       imgSrc: ["'self'", 'data:', 'https:'],
       connectSrc: [
         "'self'",
-        process.env.CLIENT_URL || 'http://localhost:3000',
+        process.env.CLIENT_URL || 'http://localhost:5173',
+        'http://localhost:5173',
+        'ws://localhost:5173',
       ],
     },
   },
@@ -32,11 +34,18 @@ export const securityHeaders = helmet({
 ============================================================ */
 
 export const corsOptions = {
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'X-Request-ID',
+    'x-request-id',
+    'X-Timestamp',
+  ],
 };
 
 export const corsMiddleware = cors(corsOptions);
@@ -53,13 +62,11 @@ export const sanitizeParams = (
   if (req.query && typeof req.query === 'object') {
     Object.keys(req.query).forEach((key) => {
       const value = req.query[key];
-
       if (Array.isArray(value)) {
         req.query[key] = value[0] as any;
       }
     });
   }
-
   next();
 };
 
@@ -75,7 +82,6 @@ export const xssProtection = (
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
-
   next();
 };
 
@@ -88,26 +94,12 @@ export const checkEnv = (
   res: Response,
   next: NextFunction
 ): void => {
-  const requiredEnvVars = [
-    'JWT_SECRET',
-    'JWT_REFRESH_SECRET',
-    'MONGODB_URI',
-  ];
-
-  const missing = requiredEnvVars.filter(
-    (envVar) => !process.env[envVar]
-  );
+  const requiredEnvVars = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'MONGODB_URI'];
+  const missing = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 
   if (missing.length > 0) {
-    logger.error(
-      `Missing required environment variables: ${missing.join(', ')}`
-    );
-
-    res.status(500).json({
-      success: false,
-      error: 'Server configuration error',
-    });
-
+    logger.error(`Missing required environment variables: ${missing.join(', ')}`);
+    res.status(500).json({ success: false, error: 'Server configuration error' });
     return;
   }
 

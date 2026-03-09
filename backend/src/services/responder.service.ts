@@ -134,7 +134,8 @@ await notificationService.notifyDriver(
         lng: incident.location.coordinates[0],
       });
 
-      const index = incident.responders.findIndex(r => r.id === responderId);
+      const index = incident.responders.findIndex(r => r.responderId.toString() === responderId);
+
       if (index !== -1) {
         incident.responders[index].eta = eta;
         incident.responders[index].location = location;
@@ -273,7 +274,8 @@ await notificationService.notifyDriver(
       const incident = await Incident.findById(incidentId);
       if (!incident) throw new Error('Incident not found');
 
-      const index = incident.responders.findIndex(r => r.id === responderId);
+      const index = incident.responders.findIndex(r => r.responderId.toString() === responderId);
+
       if (index !== -1) {
         incident.responders[index].status = 'arrived';
         incident.responders[index].arrivedAt = new Date();

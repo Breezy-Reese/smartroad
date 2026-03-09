@@ -10,6 +10,38 @@ export interface AuthRequest extends Request {
   token?: string;
 }
 
+// ─── Safe Redis Helpers ───────────────────────────────────────────────────────
+// All Redis calls go through these — if Redis is down, they silently return null
+
+const redisGet = async (key: string): Promise<string | null> => {
+  try {
+    if (!redisClient.isOpen) return null;
+    return await redisClient.get(key);
+  } catch {
+    return null;
+  }
+};
+
+const redisSet = async (key: string, ttl: number, value: string): Promise<void> => {
+  try {
+    if (!redisClient.isOpen) return;
+    await redisClient.setEx(key, ttl, value);
+  } catch {
+    // Redis unavailable, skip caching
+  }
+};
+
+const redisDel = async (key: string): Promise<void> => {
+  try {
+    if (!redisClient.isOpen) return;
+    await redisClient.del(key);
+  } catch {
+    // Redis unavailable, skip
+  }
+};
+
+// ─── authenticate ─────────────────────────────────────────────────────────────
+
 export const authenticate = async (
   req: AuthRequest,
   res: Response,
@@ -25,24 +57,23 @@ export const authenticate = async (
     // Verify token
     const decoded = jwt.verify(token, appConfig.jwt.secret) as { userId: string };
 
-    // Check if token is blacklisted
-    const isBlacklisted = await redisClient.get(`blacklist:${token}`);
+    // Check if token is blacklisted (skipped if Redis is down)
+    const isBlacklisted = await redisGet(`blacklist:${token}`);
     if (isBlacklisted) {
       return res.status(401).json({ success: false, error: 'Token is blacklisted' });
     }
 
-    // Try to get user from cache
-    let userStr = await redisClient.get(`user:${decoded.userId}`);
-    
+    // Try to get user from cache (skipped if Redis is down)
+    let userStr = await redisGet(`user:${decoded.userId}`);
+
     if (!userStr) {
       const dbUser = await User.findById(decoded.userId).select('-password -refreshToken');
       if (!dbUser || !dbUser.isActive) {
         return res.status(401).json({ success: false, error: 'User not found or inactive' });
       }
 
-      // Cache user data
       userStr = JSON.stringify(dbUser);
-      await redisClient.setEx(`user:${decoded.userId}`, 3600, userStr); // fixed key/value
+      await redisSet(`user:${decoded.userId}`, 3600, userStr);
     }
 
     req.user = JSON.parse(userStr);
@@ -54,6 +85,8 @@ export const authenticate = async (
     return res.status(401).json({ success: false, error: 'Please authenticate' });
   }
 };
+
+// ─── authorize ────────────────────────────────────────────────────────────────
 
 export const authorize = (...roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -70,6 +103,8 @@ export const authorize = (...roles: string[]) => {
   };
 };
 
+// ─── optionalAuth ─────────────────────────────────────────────────────────────
+
 export const optionalAuth = async (
   req: AuthRequest,
   _res: Response,
@@ -85,11 +120,12 @@ export const optionalAuth = async (
 
     return next();
   } catch {
-    return next(); // ignore errors
+    return next();
   }
 };
 
-// Role-based access
+// ─── Role Guards ──────────────────────────────────────────────────────────────
+
 export const requireDriver = (req: AuthRequest, res: Response, next: NextFunction) => {
   if (!req.user) return res.status(401).json({ success: false, error: 'Authentication required' });
   if (req.user.role !== 'driver') return res.status(403).json({ success: false, error: 'Driver access required' });
@@ -126,17 +162,18 @@ export const checkOwnership = (paramName: string = 'userId') => {
   };
 };
 
-// Logout middleware
+// ─── logout ───────────────────────────────────────────────────────────────────
+
 export const logout = async (req: AuthRequest, _res: Response, next: NextFunction) => {
   try {
     const token = req.token;
     if (token) {
       const decoded = jwt.decode(token) as any;
-      const expiresIn = decoded.exp - Math.floor(Date.now() / 1000);
-      if (expiresIn > 0) await redisClient.setEx(`blacklist:${token}`, expiresIn, 'true');
+      const expiresIn = decoded?.exp - Math.floor(Date.now() / 1000);
+      if (expiresIn > 0) await redisSet(`blacklist:${token}`, expiresIn, 'true');
     }
 
-    if (req.user) await redisClient.del(`user:${req.user._id}`);
+    if (req.user) await redisDel(`user:${req.user._id}`);
 
     return next();
   } catch (error) {
@@ -145,7 +182,8 @@ export const logout = async (req: AuthRequest, _res: Response, next: NextFunctio
   }
 };
 
-// Refresh token middleware
+// ─── refreshTokenAuth ─────────────────────────────────────────────────────────
+
 export const refreshTokenAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { refreshToken } = req.body;

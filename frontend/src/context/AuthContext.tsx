@@ -42,11 +42,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } else {
       setState(prev => ({ ...prev, isLoading: false }));
     }
-  }, [state.token]);
+  }, []);
 
   useEffect(() => {
     if (state.isAuthenticated && state.user) {
-      // Initialize socket connection
       socketClient.getInstance(state.token || undefined);
     } else {
       socketClient.disconnect();
@@ -56,11 +55,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const loadUser = async () => {
     try {
       setState(prev => ({ ...prev, isLoading: true }));
-      const response = await axiosInstance.get<User>('/auth/me');
-      
+      const response = await axiosInstance.get('/auth/me');
+      // Handle both { data: user } and direct user response shapes
+      const user = response.data?.data || response.data;
+
       setState(prev => ({
         ...prev,
-        user: response.data,
+        user,
         isLoading: false,
         isAuthenticated: true,
         error: null,
@@ -71,44 +72,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const redirectByRole = (role: string) => {
+    const redirectMap: Record<string, string> = {
+      driver: '/driver',
+      hospital: '/hospital',
+      admin: '/admin',
+      responder: '/responder',
+    };
+    navigate(redirectMap[role] ?? '/');
+  };
+
   const login = async (credentials: LoginCredentials) => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
-      const response = await axiosInstance.post<{ token: string; refreshToken: string; user: User }>(
-        '/auth/login',
-        credentials
-      );
+      const response = await axiosInstance.post('/auth/login', credentials);
 
-      const { token, refreshToken, user } = response.data;
+      // Backend returns: { success, message, data: { user, accessToken, refreshToken } }
+      const { user, accessToken, refreshToken } = response.data?.data || response.data;
 
-      localStorage.setItem('token', token);
+      localStorage.setItem('token', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
 
       setState({
         user,
-        token,
+        token: accessToken,
         refreshToken,
         isLoading: false,
         error: null,
         isAuthenticated: true,
       });
 
-      // Redirect based on role
-      if (user.role === 'driver') {
-        navigate('/driver');
-      } else if (user.role === 'hospital') {
-        navigate('/hospital');
-      } else if (user.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/');
-      }
-
+      redirectByRole(user.role);
     } catch (error: any) {
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        'Login failed';
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error.message || 'Login failed',
+        error: message,
         isAuthenticated: false,
       }));
       throw error;
@@ -118,39 +122,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (data: RegisterData) => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
-      const response = await axiosInstance.post<{ token: string; refreshToken: string; user: User }>(
-        '/auth/register',
-        data
-      );
+      const response = await axiosInstance.post('/auth/register', data);
 
-      const { token, refreshToken, user } = response.data;
+      // Backend returns: { success, message, data: { user, accessToken, refreshToken } }
+      const { user, accessToken, refreshToken } = response.data?.data || response.data;
 
-      localStorage.setItem('token', token);
+      localStorage.setItem('token', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
 
       setState({
         user,
-        token,
+        token: accessToken,
         refreshToken,
         isLoading: false,
         error: null,
         isAuthenticated: true,
       });
 
-      // Redirect based on role
-      if (user.role === 'driver') {
-        navigate('/driver');
-      } else if (user.role === 'hospital') {
-        navigate('/hospital');
-      } else {
-        navigate('/');
-      }
-
+      redirectByRole(user.role);
     } catch (error: any) {
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        'Registration failed';
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: error.message || 'Registration failed',
+        error: message,
         isAuthenticated: false,
       }));
       throw error;
@@ -160,7 +159,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
-    
+
     socketClient.disconnect();
 
     setState({

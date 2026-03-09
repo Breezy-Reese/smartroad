@@ -1,10 +1,18 @@
 import app from './app';
 import { logger } from './utils/logger';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from './config/database.config';
 import { redisClient } from './config/redis.config';
 import { Server } from 'socket.io';
 import http from 'http';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
+
+process.on('exit', (code) => {
+  console.log('PROCESS EXITING WITH CODE:', code);
+  console.trace('Exit stack trace');
+});
+
+console.log('SERVER FILE LOADED');
 
 // Load environment variables
 dotenv.config();
@@ -15,7 +23,6 @@ dotenv.config();
 
 const requiredEnvVars = ['MONGODB_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];
 
-// Check for missing required environment variables
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
@@ -55,7 +62,7 @@ if ((process.env.JWT_REFRESH_SECRET?.length || 0) < 32) {
 logger.info('📋 Environment Configuration:');
 logger.info(`   NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
 logger.info(`   PORT: ${process.env.PORT || 5000}`);
-logger.info(`   CLIENT_URL: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
+logger.info(`   CLIENT_URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
 logger.info(`   MONGODB_URI: ${process.env.MONGODB_URI?.replace(/:[^:@]*@/, ':****@')}`);
 logger.info(`   REDIS_HOST: ${process.env.REDIS_HOST || 'not configured'}`);
 
@@ -69,10 +76,10 @@ const PORT = process.env.PORT || 5000;
 // Create HTTP server
 const server = http.createServer(app);
 
-// Initialize Socket.io with better configuration
+// Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
   },
@@ -87,128 +94,82 @@ app.set('io', io);
 // Socket.io connection handling
 io.on('connection', (socket) => {
   logger.info(`🔌 New client connected: ${socket.id}`);
-  
+
   socket.on('disconnect', () => {
     logger.info(`🔌 Client disconnected: ${socket.id}`);
   });
-  
+
   socket.on('error', (error) => {
     logger.error(`❌ Socket error for ${socket.id}:`, error);
   });
 });
 
-// Database connection with retry logic
-const connectDB = async (retries = 5) => {
-  const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/smartroad';
-  
-  for (let i = 0; i < retries; i++) {
-    try {
-      const conn = await mongoose.connect(mongoURI, {
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000,
-        maxPoolSize: 10,
-        minPoolSize: 2,
-      });
-      
-      logger.info(`✅ MongoDB Connected: ${conn.connection.host}`);
-      
-      // Handle connection events
-      mongoose.connection.on('error', (err) => {
-        logger.error('❌ MongoDB connection error:', err);
-      });
-      
-      mongoose.connection.on('disconnected', () => {
-        logger.warn('⚠️ MongoDB disconnected');
-      });
-      
-      mongoose.connection.on('reconnected', () => {
-        logger.info('✅ MongoDB reconnected');
-      });
-      
-      return;
-    } catch (error) {
-      logger.error(`❌ MongoDB connection attempt ${i + 1}/${retries} failed:`, error);
-      
-      if (i === retries - 1) {
-        logger.error('❌ All MongoDB connection attempts failed. Exiting...');
-        process.exit(1);
-      }
-      
-      // Exponential backoff
-      const delay = Math.min(5000 * Math.pow(2, i), 30000);
-      logger.info(`⏳ Retrying in ${delay/1000} seconds...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-};
+// ============================================================
+// REDIS CONNECTION - NON-BLOCKING
+// ============================================================
 
-// Redis connection with retry logic
-const connectRedis = async (retries = 3) => {
-  // Skip Redis if not configured
+const connectRedis = async (retries = 3): Promise<void> => {
   if (!process.env.REDIS_HOST) {
     logger.warn('⚠️ Redis not configured, skipping...');
     return;
   }
-  
+
   for (let i = 0; i < retries; i++) {
     try {
       if (!redisClient.isOpen) {
         await redisClient.connect();
       }
-      
-      // Test Redis connection
+
       await redisClient.ping();
       logger.info('✅ Redis Connected');
-      
-      // Handle Redis events
+
       redisClient.on('error', (err) => {
         logger.error('❌ Redis client error:', err);
       });
-      
+
       redisClient.on('end', () => {
         logger.warn('⚠️ Redis connection ended');
       });
-      
-      return;
+
+      return; // Success, exit function
     } catch (error) {
       logger.error(`❌ Redis connection attempt ${i + 1}/${retries} failed:`, error);
-      
+
       if (i === retries - 1) {
         logger.warn('⚠️ Redis connection failed. Continuing without Redis...');
-        return;
+        return; // Don't throw, just continue without Redis
       }
-      
+
+      // Wait before retrying
       await new Promise(resolve => setTimeout(resolve, 3000));
     }
   }
 };
 
-// Graceful shutdown handler
-const gracefulShutdown = async (signal: string) => {
+// ============================================================
+// GRACEFUL SHUTDOWN
+// ============================================================
+
+const gracefulShutdown = async (signal: string): Promise<void> => {
   logger.info(`🛑 ${signal} received. Starting graceful shutdown...`);
-  
-  // Set shutdown timeout
+
   const shutdownTimeout = setTimeout(() => {
     logger.error('❌ Forceful shutdown due to timeout');
     process.exit(1);
   }, 10000);
-  
+
   try {
-    // Stop accepting new connections
     server.close(async () => {
       logger.info('📡 HTTP server closed');
-      
+
       try {
-        // Close database connections
-        await mongoose.disconnect();
-        logger.info('✅ MongoDB disconnected');
-        
-        // Close Redis connection
+        await disconnectDatabase();
+
         if (redisClient.isOpen) {
           await redisClient.quit();
           logger.info('✅ Redis disconnected');
         }
-        
+
         clearTimeout(shutdownTimeout);
         logger.info('👋 Graceful shutdown completed');
         process.exit(0);
@@ -217,8 +178,7 @@ const gracefulShutdown = async (signal: string) => {
         process.exit(1);
       }
     });
-    
-    // Force close server connections
+
     server.unref();
   } catch (error) {
     logger.error('❌ Error during shutdown:', error);
@@ -230,36 +190,47 @@ const gracefulShutdown = async (signal: string) => {
 // SERVER STARTUP
 // ============================================================
 
-const startServer = async () => {
+const startServer = async (): Promise<void> => {
   try {
     logger.info('🚀 Starting server...');
     
-    // Connect to databases
-    await connectDB();
-    await connectRedis();
-
-    // Start listening
+    // Connect to MongoDB (critical - must succeed)
+    await connectDatabase();
+    logger.info('✅ Database connected');
+    
+    // Try Redis but don't block server startup if it fails
+    try {
+      await connectRedis();
+    } catch (redisError) {
+      logger.warn('⚠️ Redis connection failed (caught), continuing without Redis');
+      // This catch shouldn't be needed now, but kept for safety
+    }
+    
+    // Start the server regardless of Redis status
     server.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT}`);
       logger.info(`📡 Socket.io server initialized`);
       logger.info(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-      logger.info(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
+      logger.info(`🌐 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
       logger.info(`✅ Server is ready to accept connections`);
     });
+    
   } catch (error) {
     logger.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 };
 
-// Handle uncaught exceptions
+// ============================================================
+// PROCESS EVENT HANDLERS
+// ============================================================
+
 process.on('uncaughtException', (err) => {
   logger.error('❌ Uncaught Exception:', err);
   logger.error(err.stack);
   gracefulShutdown('UNCAUGHT EXCEPTION');
 });
 
-// Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
   logger.error('❌ Unhandled Rejection:', err);
   if (err instanceof Error) {
@@ -268,20 +239,20 @@ process.on('unhandledRejection', (err) => {
   gracefulShutdown('UNHANDLED REJECTION');
 });
 
-// Handle termination signals
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
-// Handle warning events
 process.on('warning', (warning) => {
   logger.warn('⚠️ Process Warning:', warning.message);
 });
 
-// Start the server
-startServer();
-
-// Keep the process alive - THIS IS THE KEY FIX!
-process.stdin.resume();
-
-// Log that the server is running
-logger.info('✨ Server process is now running. Press Ctrl+C to stop.');
+// ============================================================
+// START THE SERVER (SINGLE CALL)
+// ============================================================
+console.log('CALLING START SERVER');
+startServer().then(() => {
+  console.log('✅ START SERVER RESOLVED - SERVER IS RUNNING');
+}).catch((err) => {
+  console.error('❌ START SERVER REJECTED:', err);
+  process.exit(1);
+});

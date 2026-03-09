@@ -1,35 +1,62 @@
-// src/models/ResponderStatus.model.ts
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Schema, Document, Types, Model } from 'mongoose';
 
-export interface IResponderStatus extends Document {
-  responderId: mongoose.Types.ObjectId;
-  isAvailable: boolean;
-  status: 'available' | 'en-route' | 'on-scene' | 'transporting' | 'off-duty';
-  currentLocation: {
-    type: 'Point';
-    coordinates: [number, number]; // [lng, lat]
-  };
-  currentIncidentId?: mongoose.Types.ObjectId;
-  lastUpdate: Date;
+export type ResponderStatusType =
+  | 'available'
+  | 'en-route'
+  | 'on-scene'
+  | 'transporting'
+  | 'off-duty';
+
+export interface IGeoLocation {
+  type: 'Point';
+  coordinates: [number, number];
 }
 
-const responderStatusSchema = new Schema<IResponderStatus>({
-  responderId: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
-  isAvailable: { type: Boolean, default: true },
-  status: { 
-    type: String, 
-    enum: ['available', 'en-route', 'on-scene', 'transporting', 'off-duty'],
-    default: 'available'
-  },
-  currentLocation: {
-    type: { type: String, enum: ['Point'], default: 'Point' },
-    coordinates: { type: [Number], required: true, default: [0, 0] }
-  },
-  currentIncidentId: { type: Schema.Types.ObjectId, ref: 'Incident' },
-  lastUpdate: { type: Date, default: Date.now }
-});
+export interface IResponderStatus extends Document {
+  responderId: Types.ObjectId;
+  isAvailable: boolean;
+  currentLocation: IGeoLocation;
+  currentIncidentId?: Types.ObjectId;
+  status: ResponderStatusType;
+  lastUpdate: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-// Create a geospatial index for location queries
-responderStatusSchema.index({ currentLocation: '2dsphere' });
+const GeoLocationSchema = new Schema<IGeoLocation>(
+  {
+    type: { type: String, enum: ['Point'], default: 'Point', required: true },
+    coordinates: {
+      type: [Number],
+      required: true,
+      validate: {
+        validator: (value: number[]) => value.length === 2,
+        message: 'Coordinates must be [longitude, latitude]',
+      },
+    },
+  },
+  { _id: false }
+);
 
-export const ResponderStatus = mongoose.model<IResponderStatus>('ResponderStatus', responderStatusSchema);
+const ResponderStatusSchema = new Schema<IResponderStatus>(
+  {
+    responderId: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+    isAvailable: { type: Boolean, default: true },
+    currentLocation: { type: GeoLocationSchema, required: true },
+    currentIncidentId: { type: Schema.Types.ObjectId, ref: 'Incident', default: null },
+    status: {
+      type: String,
+      enum: ['available', 'en-route', 'on-scene', 'transporting', 'off-duty'],
+      default: 'available',
+    },
+    lastUpdate: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+
+ResponderStatusSchema.index({ currentLocation: '2dsphere' });
+ResponderStatusSchema.index({ status: 1, isAvailable: 1 });
+ResponderStatusSchema.index({ currentIncidentId: 1 });
+
+export const ResponderStatus: Model<IResponderStatus> =
+  mongoose.model<IResponderStatus>('ResponderStatus', ResponderStatusSchema);
