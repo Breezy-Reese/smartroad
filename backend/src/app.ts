@@ -16,6 +16,7 @@ import userRoutes from './routes/user.routes';
 import locationRoutes from './routes/location.routes';
 import hospitalRoutes from './routes/hospital.routes';
 import incidentRoutes from './routes/incident.routes';
+import adminRoutes from './routes/admin.routes';
 
 const app: Express = express();
 
@@ -68,6 +69,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/hospitals', hospitalRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 handler
 app.use(notFound);

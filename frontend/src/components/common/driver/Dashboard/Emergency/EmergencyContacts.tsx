@@ -43,7 +43,8 @@ const EmergencyContacts: React.FC = () => {
   const fetchContacts = async () => {
     try {
       const data = await emergencyService.getEmergencyContacts();
-      setContacts(data);
+const contacts = Array.isArray(data) ? data : (data as any)?.data || [];
+setContacts(contacts);
     } catch (error) {
       console.error('Failed to fetch contacts:', error);
       toast.error('Failed to load emergency contacts');

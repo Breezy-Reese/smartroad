@@ -1,24 +1,23 @@
 import axiosInstance from './axiosInstance';
-import { 
-  Incident, 
-  CreateIncidentDto, 
+import {
+  Incident,
+  CreateIncidentDto,
   UpdateIncidentDto,
   IncidentReport,
-  EmergencyAlert,
-  IncidentStatus 
+  IncidentStatus
 } from '../../types/emergency.types';
 import { Coordinates } from '../../types/location.types';
 
 class EmergencyService {
-  private baseUrl = '/emergency';
+  private baseUrl = '/incidents'; // ← corrected from /emergency to /incidents
 
   async createEmergency(data: CreateIncidentDto): Promise<Incident> {
-    const response = await axiosInstance.post<Incident>(`${this.baseUrl}/alert`, data);
+    const response = await axiosInstance.post<Incident>(`${this.baseUrl}`, data);
     return response.data;
   }
 
   async getIncident(incidentId: string): Promise<Incident> {
-    const response = await axiosInstance.get<Incident>(`${this.baseUrl}/incident/${incidentId}`);
+    const response = await axiosInstance.get<Incident>(`${this.baseUrl}/${incidentId}`);
     return response.data;
   }
 
@@ -33,7 +32,7 @@ class EmergencyService {
     lng?: number;
     status?: string;
   }): Promise<Incident[]> {
-    const response = await axiosInstance.get<Incident[]>(`${this.baseUrl}/incidents`, { params });
+    const response = await axiosInstance.get<Incident[]>(`${this.baseUrl}/active`, { params });
     return response.data;
   }
 
@@ -43,7 +42,7 @@ class EmergencyService {
   }
 
   async acceptIncident(incidentId: string, hospitalId: string, responderId: string, eta: number): Promise<void> {
-    await axiosInstance.post(`${this.baseUrl}/accept/${incidentId}`, {
+    await axiosInstance.post(`${this.baseUrl}/${incidentId}/accept`, {
       hospitalId,
       responderId,
       eta,
@@ -51,15 +50,15 @@ class EmergencyService {
   }
 
   async cancelEmergency(incidentId: string): Promise<void> {
-    await axiosInstance.post(`${this.baseUrl}/cancel/${incidentId}`);
+    await axiosInstance.post(`${this.baseUrl}/${incidentId}/cancel`);
   }
 
   async reportAccident(data: any): Promise<void> {
-    await axiosInstance.post(`${this.baseUrl}/report`, data);
+    await axiosInstance.post(`${this.baseUrl}`, data);
   }
 
   async getIncidentReport(incidentId: string): Promise<IncidentReport> {
-    const response = await axiosInstance.get<IncidentReport>(`${this.baseUrl}/report/${incidentId}`);
+    const response = await axiosInstance.get<IncidentReport>(`${this.baseUrl}/${incidentId}/report`);
     return response.data;
   }
 
@@ -69,7 +68,7 @@ class EmergencyService {
   }
 
   async getNearbyHospitals(location: Coordinates, radius: number = 10): Promise<any[]> {
-    const response = await axiosInstance.get(`${this.baseUrl}/hospitals/nearby`, {
+    const response = await axiosInstance.get('/hospitals/nearby', {
       params: {
         lat: location.lat,
         lng: location.lng,
@@ -80,14 +79,15 @@ class EmergencyService {
   }
 
   async addWitnessReport(incidentId: string, data: any): Promise<any> {
-    const response = await axiosInstance.post(`${this.baseUrl}/witness/${incidentId}`, data);
+    const response = await axiosInstance.post(`${this.baseUrl}/${incidentId}/witness`, data);
     return response.data;
   }
 
   async getEmergencyContacts(): Promise<any[]> {
-    const response = await axiosInstance.get('/users/emergency-contacts');
-    return response.data;
-  }
+  const response = await axiosInstance.get('/users/emergency-contacts');
+  const data = response.data;
+  return Array.isArray(data) ? data : data?.data || [];
+}
 
   async addEmergencyContact(data: any): Promise<any> {
     const response = await axiosInstance.post('/users/emergency-contacts', data);

@@ -6,7 +6,7 @@ import {
   ILoginRequest,
   IRegisterRequest,
   IUser,
-} from '../types/user.types'; // Changed from IUserDocument to IUser
+} from '../types/user.types';
 import { logger } from '../utils/logger';
 import { emailService } from './email.service';
 import { redisClient } from '../config/redis.config';
@@ -19,102 +19,94 @@ class AuthService {
     passwordReset: '1h',
   };
 
- // ================= REGISTER =================
+  // ================= REGISTER =================
 
-async register(
-  userData: IRegisterRequest
-): Promise<{ user: IUser; tokens: IAuthTokens }> {
-  try {
-    const existingUser = await User.findOne({ email: userData.email });
+  async register(
+    userData: IRegisterRequest
+  ): Promise<{ user: IUser; tokens: IAuthTokens }> {
+    try {
+      const existingUser = await User.findOne({ email: userData.email });
 
-    if (existingUser) {
-      throw new Error('User already exists with this email');
+      if (existingUser) {
+        throw new Error('User already exists with this email');
+      }
+
+      const user = new User(userData);
+      await user.save();
+
+      const tokens = this.generateTokens(user._id.toString(), user.role);
+
+      user.refreshToken = tokens.refreshToken;
+      await user.save();
+
+      const userObject = (user as any).toObject ? (user as any).toObject() : user;
+      await this.cacheUserData(userObject as IUser);
+
+      await emailService
+        .sendWelcomeEmail(user.email, user.name)
+        .catch((err) => logger.error('Welcome email failed:', err));
+
+      logger.info(`User registered: ${user.email} (${user.role})`);
+
+      return { user: userObject as IUser, tokens };
+    } catch (error) {
+      logger.error('Registration service error:', error);
+      throw error;
     }
-
-    const user = new User(userData);
-    await user.save();
-
-    const tokens = this.generateTokens(user._id.toString(), user.role);
-
-    user.refreshToken = tokens.refreshToken;
-    await user.save();
-
-    // FIX: Convert to plain object before caching
-    const userObject = (user as any).toObject ? (user as any).toObject() : user;
-    await this.cacheUserData(userObject as IUser);
-
-    await emailService
-      .sendWelcomeEmail(user.email, user.name)
-      .catch((err) => logger.error('Welcome email failed:', err));
-
-    logger.info(`User registered: ${user.email} (${user.role})`);
-
-    // Return the already converted object
-    return { user: userObject as IUser, tokens };
-  } catch (error) {
-    logger.error('Registration service error:', error);
-    throw error;
   }
-}
- // ================= LOGIN =================
 
-async login(
-  credentials: ILoginRequest
-): Promise<{ user: IUser; tokens: IAuthTokens }> {
-  try {
-    const user = await User.findOne({ email: credentials.email }).select(
-      '+password'
-    );
+  // ================= LOGIN =================
 
-    if (!user) {
-      throw new Error('Invalid email or password');
+  async login(
+    credentials: ILoginRequest
+  ): Promise<{ user: IUser; tokens: IAuthTokens }> {
+    try {
+      const user = await User.findOne({ email: credentials.email }).select('+password');
+
+      if (!user) {
+        throw new Error('Invalid email or password');
+      }
+
+      if (!user.isActive) {
+        throw new Error('Account is deactivated');
+      }
+
+      const isPasswordValid = await (user as any).comparePassword(credentials.password);
+
+      if (!isPasswordValid) {
+        throw new Error('Invalid email or password');
+      }
+
+      user.lastLogin = new Date();
+
+      const expiresIn = credentials.rememberMe ? '30d' : '7d';
+      const tokens = this.generateTokens(user._id.toString(), user.role, expiresIn);
+
+      user.refreshToken = tokens.refreshToken;
+      await user.save();
+
+      const userObject = (user as any).toObject ? (user as any).toObject() : user;
+      await this.cacheUserData(userObject as IUser);
+
+      logger.info(`User logged in: ${user.email}`);
+
+      return { user: userObject as IUser, tokens };
+    } catch (error) {
+      logger.error('Login service error:', error);
+      throw error;
     }
-
-    if (!user.isActive) {
-      throw new Error('Account is deactivated');
-    }
-
-    const isPasswordValid = await (user as any).comparePassword(credentials.password);
-
-    if (!isPasswordValid) {
-      throw new Error('Invalid email or password');
-    }
-
-    user.lastLogin = new Date();
-
-    const expiresIn = credentials.rememberMe ? '30d' : '7d';
-
-    const tokens = this.generateTokens(user._id.toString(), user.role, expiresIn);
-
-    user.refreshToken = tokens.refreshToken;
-    await user.save();
-
-    // FIX: Convert to plain object before caching
-    const userObject = (user as any).toObject ? (user as any).toObject() : user;
-    await this.cacheUserData(userObject as IUser);
-
-    logger.info(`User logged in: ${user.email}`);
-
-    return { user: userObject as IUser, tokens };
-  } catch (error) {
-    logger.error('Login service error:', error);
-    throw error;
   }
-}
 
   // ================= REFRESH TOKEN =================
 
   async refreshToken(refreshToken: string): Promise<IAuthTokens> {
     try {
-      const decoded = jwt.verify(
-        refreshToken,
-        appConfig.jwt.refreshSecret
-      ) as { userId: string; role: string };
+      const decoded = jwt.verify(refreshToken, appConfig.jwt.refreshSecret) as {
+        userId: string;
+        role: string;
+      };
 
-      const user = await User.findOne({
-        _id: decoded.userId,
-        refreshToken,
-      });
+      const user = await User.findOne({ _id: decoded.userId, refreshToken });
 
       if (!user) {
         throw new Error('Invalid refresh token');
@@ -140,8 +132,13 @@ async login(
     try {
       await User.findByIdAndUpdate(userId, { refreshToken: null });
 
-      await redisClient.del(`user:${userId}`);
-      await redisClient.del(`user:${userId}:profile`);
+      // Gracefully handle Redis being unavailable
+      try {
+        await redisClient.del(`user:${userId}`);
+        await redisClient.del(`user:${userId}:profile`);
+      } catch (redisErr) {
+        logger.warn('Redis unavailable during logout, skipping cache clear');
+      }
 
       logger.info(`User logged out: ${userId}`);
     } catch (error) {
@@ -152,122 +149,113 @@ async login(
 
   // ================= EMAIL VERIFICATION =================
 
-async verifyEmail(token: string): Promise<boolean> {
-  try {
-    const decoded = jwt.verify(token, appConfig.jwt.secret) as {
-      userId: string;
-    };
+  async verifyEmail(token: string): Promise<boolean> {
+    try {
+      const decoded = jwt.verify(token, appConfig.jwt.secret) as { userId: string };
 
-    const user = await User.findById(decoded.userId);
+      const user = await User.findById(decoded.userId);
 
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    if (user.isVerified) return true;
-
-    user.isVerified = true;
-    (user as any).emailVerificationToken = undefined;
-
-    await user.save();
-    
-    // FIX: Convert to plain object before caching
-    const userObject = (user as any).toObject ? (user as any).toObject() : user;
-    await this.cacheUserData(userObject as IUser);
-
-    logger.info(`Email verified: ${user.email}`);
-
-    return true;
-  } catch (error) {
-    logger.error('Email verification error:', error);
-    throw error;
-  }
-}
-
-async generateEmailVerificationToken(userId: string): Promise<string> {
-  // Create a simple string token if you don't need JWT
-  const token = Buffer.from(`${userId}-${Date.now()}`).toString('base64');
-
-  await User.findByIdAndUpdate(userId, {
-    emailVerificationToken: token,
-  });
-
-  return token;
-}
-// ================= FORGOT PASSWORD =================
-
-async forgotPassword(email: string): Promise<string> {
-  try {
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    // Generate a simple token (matching your email verification style)
-    const resetToken = Buffer.from(`${user._id}-${Date.now()}-${Math.random()}`).toString('base64');
-
-    // Store token and expiry
-    (user as any).passwordResetToken = resetToken;
-    (user as any).passwordResetExpires = new Date(Date.now() + 3600000); // 1 hour
-
-    await user.save();
-
-    // Send email with reset token
-    await emailService.sendEmail({
-      to: user.email,
-      subject: 'Password Reset Request',
-      template: 'password-reset',
-      data: {
-        name: user.name,
-        resetLink: `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`
+      if (!user) {
+        throw new Error('User not found');
       }
-    });
 
-    logger.info(`Password reset requested for: ${email}`);
+      if (user.isVerified) return true;
 
-    return resetToken;
-  } catch (error) {
-    logger.error('Forgot password error:', error);
-    throw error;
+      user.isVerified = true;
+      (user as any).emailVerificationToken = undefined;
+
+      await user.save();
+
+      const userObject = (user as any).toObject ? (user as any).toObject() : user;
+      await this.cacheUserData(userObject as IUser);
+
+      logger.info(`Email verified: ${user.email}`);
+
+      return true;
+    } catch (error) {
+      logger.error('Email verification error:', error);
+      throw error;
+    }
   }
-}
+
+  async generateEmailVerificationToken(userId: string): Promise<string> {
+    const token = Buffer.from(`${userId}-${Date.now()}`).toString('base64');
+    await User.findByIdAndUpdate(userId, { emailVerificationToken: token });
+    return token;
+  }
+
+  // ================= FORGOT PASSWORD =================
+
+  async forgotPassword(email: string): Promise<string> {
+    try {
+      const user = await User.findOne({ email });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      const resetToken = Buffer.from(`${user._id}-${Date.now()}-${Math.random()}`).toString('base64');
+
+      (user as any).passwordResetToken = resetToken;
+      (user as any).passwordResetExpires = new Date(Date.now() + 3600000);
+
+      await user.save();
+
+      await emailService.sendEmail({
+        to: user.email,
+        subject: 'Password Reset Request',
+        template: 'password-reset',
+        data: {
+          name: user.name,
+          resetLink: `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`,
+        },
+      });
+
+      logger.info(`Password reset requested for: ${email}`);
+
+      return resetToken;
+    } catch (error) {
+      logger.error('Forgot password error:', error);
+      throw error;
+    }
+  }
 
   // ================= PASSWORD RESET =================
 
   async resetPassword(token: string, newPassword: string): Promise<boolean> {
-  try {
-    // Since we're not using JWT, we can't decode the userId from the token
-    // We need to find the user by the token directly
-    const user = await User.findOne({
-      passwordResetToken: token,
-      passwordResetExpires: { $gt: new Date() },
-    }).select('+password');
+    try {
+      const user = await User.findOne({
+        passwordResetToken: token,
+        passwordResetExpires: { $gt: new Date() },
+      }).select('+password');
 
-    if (!user) {
-      throw new Error('Invalid or expired reset token');
+      if (!user) {
+        throw new Error('Invalid or expired reset token');
+      }
+
+      user.password = newPassword;
+      (user as any).passwordResetToken = undefined;
+      (user as any).passwordResetExpires = undefined;
+      user.refreshToken = undefined;
+
+      await user.save();
+
+      try {
+        await redisClient.del(`user:${user._id}`);
+        await redisClient.del(`user:${user._id}:profile`);
+      } catch (redisErr) {
+        logger.warn('Redis unavailable during password reset, skipping cache clear');
+      }
+
+      logger.info(`Password reset successful: ${user.email}`);
+
+      return true;
+    } catch (error) {
+      logger.error('Reset password error:', error);
+      throw error;
     }
-
-    user.password = newPassword;
-    (user as any).passwordResetToken = undefined;
-    (user as any).passwordResetExpires = undefined;
-    user.refreshToken = undefined;
-
-    await user.save();
-
-    await redisClient.del(`user:${user._id}`);
-    await redisClient.del(`user:${user._id}:profile`);
-
-    logger.info(`Password reset successful: ${user.email}`);
-
-    return true;
-  } catch (error) {
-    logger.error('Reset password error:', error);
-    throw error;
   }
-}
 
- 
   // ================= PASSWORD CHANGE =================
 
   async changePassword(
@@ -293,8 +281,12 @@ async forgotPassword(email: string): Promise<string> {
 
       await user.save();
 
-      await redisClient.del(`user:${userId}`);
-      await redisClient.del(`user:${userId}:profile`);
+      try {
+        await redisClient.del(`user:${userId}`);
+        await redisClient.del(`user:${userId}:profile`);
+      } catch (redisErr) {
+        logger.warn('Redis unavailable during password change, skipping cache clear');
+      }
 
       logger.info(`Password changed: ${user.email}`);
 
@@ -313,11 +305,7 @@ async forgotPassword(email: string): Promise<string> {
         userId: string;
         role: string;
       };
-
-      return {
-        userId: decoded.userId,
-        role: decoded.role,
-      };
+      return { userId: decoded.userId, role: decoded.role };
     } catch (error) {
       logger.error('Token validation error:', error);
       throw new Error('Invalid or expired token');
@@ -326,66 +314,63 @@ async forgotPassword(email: string): Promise<string> {
 
   // ================= CACHE =================
 
-  async getUserFromCache(userId: string): Promise<IUser | null> { // Changed return type
+  async getUserFromCache(userId: string): Promise<IUser | null> {
     try {
       const cached = await redisClient.get(`user:${userId}`);
-
       if (!cached) return null;
-
       return JSON.parse(cached) as IUser;
     } catch (error) {
-      logger.error('Cache read error:', error);
+      logger.warn('Cache read error, falling back to DB');
       return null;
     }
   }
 
-  async cacheUserData(user: IUser): Promise<void> { // Changed parameter type
+  async cacheUserData(user: IUser): Promise<void> {
     try {
       const data = JSON.stringify(user);
-
       await redisClient.setEx(`user:${user._id}`, 3600, data);
       await redisClient.setEx(`user:${user._id}:profile`, 300, data);
     } catch (error) {
-      logger.error('Cache write error:', error);
+      logger.warn('Cache write failed, continuing without cache');
     }
   }
 
   // ================= PROFILE =================
 
-  async getProfile(userId: string): Promise<IUser | null> { // Changed return type
+  async getProfile(userId: string): Promise<IUser | null> {
+    // Try Redis cache first, but never let Redis failure block the response
     try {
       const cached = await redisClient.get(`user:${userId}:profile`);
-
       if (cached) {
         return JSON.parse(cached);
       }
+    } catch (redisErr) {
+      logger.warn('Redis unavailable for profile cache, fetching from DB');
+    }
 
+    // Always fall back to MongoDB
+    try {
       const user = await User.findById(userId)
         .select('-refreshToken -password')
         .populate('vehicleId', 'plateNumber model make');
 
       if (user) {
-        // Convert to plain object before caching
         const userObject = (user as any).toObject ? (user as any).toObject() : user;
-        await this.cacheUserData(userObject as IUser);
+        await this.cacheUserData(userObject as IUser); // non-fatal if this fails
         return userObject as IUser;
       }
 
       return null;
     } catch (error) {
       logger.error('Profile fetch error:', error);
-      throw error;
+      return null; // ← return null instead of throwing, prevents 500
     }
   }
 
-  async updateProfile(
-    userId: string,
-    updates: Partial<IUser>
-  ): Promise<IUser> { // Changed parameter and return type
+  async updateProfile(userId: string, updates: Partial<IUser>): Promise<IUser> {
     try {
       delete updates.password;
       delete updates.refreshToken;
-      // Don't delete role - users shouldn't update their role anyway
 
       const user = await User.findByIdAndUpdate(
         userId,
@@ -397,7 +382,6 @@ async forgotPassword(email: string): Promise<string> {
         throw new Error('User not found');
       }
 
-      // Convert to plain object before returning
       const userObject = (user as any).toObject ? (user as any).toObject() : user;
       await this.cacheUserData(userObject as IUser);
 
@@ -416,10 +400,7 @@ async forgotPassword(email: string): Promise<string> {
     try {
       const user = await User.findByIdAndUpdate(
         userId,
-        {
-          isActive: false,
-          refreshToken: null,
-        },
+        { isActive: false, refreshToken: null },
         { new: true }
       );
 
@@ -427,8 +408,12 @@ async forgotPassword(email: string): Promise<string> {
         throw new Error('User not found');
       }
 
-      await redisClient.del(`user:${userId}`);
-      await redisClient.del(`user:${userId}:profile`);
+      try {
+        await redisClient.del(`user:${userId}`);
+        await redisClient.del(`user:${userId}:profile`);
+      } catch (redisErr) {
+        logger.warn('Redis unavailable during account deactivation, skipping cache clear');
+      }
 
       logger.info(`Account deactivated: ${user.email}`);
 
@@ -441,23 +426,21 @@ async forgotPassword(email: string): Promise<string> {
 
   // ================= TOKEN GENERATION =================
 
-private generateTokens(
-  userId: string,
-  role: string,
-  expiresIn: string = this.TOKEN_EXPIRY.access
-): IAuthTokens {
-  // FIX: Use type assertion for payload
-  const payload = { userId, role } as object;
-  
-  // FIX: Use type assertion for options
-  const accessOptions = { expiresIn } as jwt.SignOptions;
-  const refreshOptions = { expiresIn: this.TOKEN_EXPIRY.refresh } as jwt.SignOptions;
+  private generateTokens(
+    userId: string,
+    role: string,
+    expiresIn: string = this.TOKEN_EXPIRY.access
+  ): IAuthTokens {
+    const payload = { userId, role } as object;
+    const accessOptions = { expiresIn } as jwt.SignOptions;
+    const refreshOptions = { expiresIn: this.TOKEN_EXPIRY.refresh } as jwt.SignOptions;
 
-  const accessToken = jwt.sign(payload, appConfig.jwt.secret, accessOptions);
-  const refreshToken = jwt.sign(payload, appConfig.jwt.refreshSecret, refreshOptions);
+    const accessToken = jwt.sign(payload, appConfig.jwt.secret, accessOptions);
+    const refreshToken = jwt.sign(payload, appConfig.jwt.refreshSecret, refreshOptions);
 
-  return { accessToken, refreshToken };
-}
+    return { accessToken, refreshToken };
+  }
+
   // ================= MFA (Placeholder) =================
 
   async verifyMFA(_userId: string, _code: string): Promise<boolean> {

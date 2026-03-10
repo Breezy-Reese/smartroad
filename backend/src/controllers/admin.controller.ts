@@ -194,8 +194,9 @@ export const getAllIncidents = async (req: Request, res: Response) => {
 
 export const getSystemHealth = async (_req: Request, res: Response) => {
   try {
-    const mongoose = await import('mongoose');
-    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+    // Use static import instead of dynamic
+    const mongoose = require('mongoose');
+    const dbStatus = mongoose.connection?.readyState === 1 ? 'connected' : 'disconnected';
 
     return res.json({
       success: true,

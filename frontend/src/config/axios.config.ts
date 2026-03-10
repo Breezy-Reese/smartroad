@@ -56,7 +56,8 @@ class AxiosConfig {
               // Wait for existing refresh to complete
               if (!AxiosConfig.refreshPromise) {
                 AxiosConfig.refreshPromise = axios
-                  .post(`${config.apiUrl}/auth/refresh`, { refreshToken })
+                  .post(`${config.apiUrl}/auth/refresh-token`, { refreshToken })
+
                   .then((response) => {
                     const { token } = response.data;
                     localStorage.setItem('token', token);

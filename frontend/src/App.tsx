@@ -18,10 +18,19 @@ import ProtectedRoute from './components/common/auth/ProtectedRoute';
 import DriverDashboard from './components/common/driver/Dashboard/DriverDashboard';
 import EmergencyContacts from './components/common/driver/Dashboard/Emergency/EmergencyContacts';
 import TripHistory from './components/common/driver/Dashboard/Trips/TripHistory';
+import DriverProfile from './components/common/driver/Dashboard/Profile/DriverProfile';
 
 // Hospital Components
 import HospitalDashboard from './components/common/hospital/HospitalDashboard';
 import IncidentList from './components/common/hospital/IncidentList';
+
+// Admin Components
+import AdminDashboard from './components/common/admin/Dashboard/AdminDashboard';
+import UserManagement from './components/common/admin/Users/UserManagement';
+import UserRoles from './components/common/admin/Users/UserRoles';
+import SystemHealth from './components/common/admin/System/SystemHealth';
+import Logs from './components/common/admin/System/Logs';
+import SystemReports from './components/common/admin/Reports/SystemReports';
 
 // Emergency Components
 import AlertScreen from "./components/common/emergency/AlertScreen";
@@ -40,23 +49,14 @@ const App: React.FC = () => {
             position="top-right"
             toastOptions={{
               duration: 4000,
-              style: {
-                background: '#363636',
-                color: '#fff',
-              },
+              style: { background: '#363636', color: '#fff' },
               success: {
                 duration: 3000,
-                iconTheme: {
-                  primary: '#10b981',
-                  secondary: '#fff',
-                },
+                iconTheme: { primary: '#10b981', secondary: '#fff' },
               },
               error: {
                 duration: 5000,
-                iconTheme: {
-                  primary: '#ef4444',
-                  secondary: '#fff',
-                },
+                iconTheme: { primary: '#ef4444', secondary: '#fff' },
               },
             }}
           />
@@ -68,64 +68,36 @@ const App: React.FC = () => {
               <Route path="/register" element={<Register />} />
             </Route>
 
-            {/* Emergency Routes - Public */}
+            {/* Emergency Routes */}
             <Route element={<EmergencyLayout />}>
               <Route path="/alert/:incidentId" element={<AlertScreen />} />
             </Route>
 
             {/* Main Routes with Layout */}
             <Route element={<MainLayout />}>
-              {/* Home/Info Pages */}
               <Route path="/" element={<HomePage />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
 
               {/* Driver Routes */}
-              <Route
-                path="/driver"
-                element={
-                  <ProtectedRoute allowedRoles={['driver']}>
-                    <DriverDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/driver/contacts"
-                element={
-                  <ProtectedRoute allowedRoles={['driver']}>
-                    <EmergencyContacts />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/driver/trips"
-                element={
-                  <ProtectedRoute allowedRoles={['driver']}>
-                    <TripHistory />
-                  </ProtectedRoute>
-                }
-              />
-
+              <Route path="/driver" element={<ProtectedRoute allowedRoles={['driver']}><DriverDashboard /></ProtectedRoute>} />
+              <Route path="/driver/contacts" element={<ProtectedRoute allowedRoles={['driver']}><EmergencyContacts /></ProtectedRoute>} />
+              <Route path="/driver/trips" element={<ProtectedRoute allowedRoles={['driver']}><TripHistory /></ProtectedRoute>} />
+              <Route path="/driver/profile" element={<ProtectedRoute allowedRoles={['driver']}><DriverProfile /></ProtectedRoute>} />
               {/* Hospital Routes */}
-              <Route
-                path="/hospital"
-                element={
-                  <ProtectedRoute allowedRoles={['hospital', 'admin']}>
-                    <HospitalDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/hospital/incidents"
-                element={
-                  <ProtectedRoute allowedRoles={['hospital', 'admin']}>
-                    <IncidentList />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/hospital" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><HospitalDashboard /></ProtectedRoute>} />
+              <Route path="/hospital/incidents" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><IncidentList /></ProtectedRoute>} />
+
+              {/* Admin Routes */}
+              <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+              <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin']}><UserManagement /></ProtectedRoute>} />
+              <Route path="/admin/users/roles" element={<ProtectedRoute allowedRoles={['admin']}><UserRoles /></ProtectedRoute>} />
+              <Route path="/admin/system" element={<ProtectedRoute allowedRoles={['admin']}><SystemHealth /></ProtectedRoute>} />
+              <Route path="/admin/system/logs" element={<ProtectedRoute allowedRoles={['admin']}><Logs /></ProtectedRoute>} />
+              <Route path="/admin/reports" element={<ProtectedRoute allowedRoles={['admin']}><SystemReports /></ProtectedRoute>} />
             </Route>
 
-            {/* Fallback Route */}
+            {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </SocketProvider>

@@ -10,6 +10,9 @@ import {
   Cog6ToothIcon,
   PhoneIcon,
   ClockIcon,
+  UsersIcon,
+  WrenchScrewdriverIcon,
+  DocumentChartBarIcon,
 } from '@heroicons/react/24/outline';
 
 interface NavItem {
@@ -20,59 +23,99 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  // Admin routes
   {
     name: 'Dashboard',
-    to: '/dashboard',
+    to: '/admin',
     icon: HomeIcon,
-    roles: ['driver', 'hospital', 'admin'],
+    roles: ['admin'],
   },
   {
-    name: 'Live Tracking',
-    to: '/tracking',
-    icon: MapIcon,
-    roles: ['hospital', 'admin'],
+    name: 'User Management',
+    to: '/admin/users',
+    icon: UsersIcon,
+    roles: ['admin'],
+  },
+  {
+    name: 'System Health',
+    to: '/admin/system',
+    icon: WrenchScrewdriverIcon,
+    roles: ['admin'],
+  },
+  {
+    name: 'Reports',
+    to: '/admin/reports',
+    icon: DocumentChartBarIcon,
+    roles: ['admin'],
+  },
+
+  // Hospital routes
+  {
+    name: 'Dashboard',
+    to: '/hospital',
+    icon: HomeIcon,
+    roles: ['hospital'],
   },
   {
     name: 'Incidents',
-    to: '/incidents',
+    to: '/hospital/incidents',
     icon: TruckIcon,
-    roles: ['hospital', 'admin'],
+    roles: ['hospital'],
   },
   {
     name: 'Responders',
-    to: '/responders',
+    to: '/hospital/responders',
     icon: UserGroupIcon,
-    roles: ['hospital', 'admin'],
+    roles: ['hospital'],
+  },
+  {
+    name: 'Ambulances',
+    to: '/hospital/ambulances',
+    icon: MapIcon,
+    roles: ['hospital'],
   },
   {
     name: 'Analytics',
-    to: '/analytics',
+    to: '/hospital/analytics',
     icon: ChartBarIcon,
-    roles: ['hospital', 'admin'],
+    roles: ['hospital'],
+  },
+  {
+    name: 'Settings',
+    to: '/hospital/settings',
+    icon: Cog6ToothIcon,
+    roles: ['hospital'],
+  },
+
+  // Driver routes
+  {
+    name: 'Dashboard',
+    to: '/driver',
+    icon: HomeIcon,
+    roles: ['driver'],
   },
   {
     name: 'My Trips',
-    to: '/trips',
+    to: '/driver/trips',
     icon: ClockIcon,
     roles: ['driver'],
   },
   {
     name: 'Emergency Contacts',
-    to: '/contacts',
+    to: '/driver/contacts',
     icon: PhoneIcon,
     roles: ['driver'],
   },
   {
-    name: 'Settings',
-    to: '/settings',
+    name: 'Profile',
+    to: '/driver/profile',
     icon: Cog6ToothIcon,
-    roles: ['driver', 'hospital', 'admin'],
+    roles: ['driver'],
   },
 ];
 
 const Sidebar: React.FC = () => {
   const { user } = useAuth();
-
   const filteredItems = navItems.filter(
     (item) => user && item.roles.includes(user.role)
   );
@@ -84,10 +127,11 @@ const Sidebar: React.FC = () => {
           <NavLink
             key={item.to}
             to={item.to}
+            end={item.to === '/admin' || item.to === '/hospital' || item.to === '/driver'}
             className={({ isActive }) =>
               `group flex items-center px-2 py-2 text-sm font-medium rounded-md mb-1 ${
                 isActive
-                  ? 'bg-emergency-100 text-emergency-700'
+                  ? 'bg-red-100 text-red-700'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }`
             }
@@ -96,7 +140,7 @@ const Sidebar: React.FC = () => {
               <>
                 <item.icon
                   className={`mr-3 h-5 w-5 ${
-                    isActive ? 'text-emergency-500' : 'text-gray-400 group-hover:text-gray-500'
+                    isActive ? 'text-red-500' : 'text-gray-400 group-hover:text-gray-500'
                   }`}
                 />
                 {item.name}
