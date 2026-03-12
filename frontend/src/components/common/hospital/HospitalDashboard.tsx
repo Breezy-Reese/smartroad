@@ -5,7 +5,6 @@ import { useSocket } from '../../../hooks/useSocket';
 import { emergencyService } from '../../../services/api/emergency.service';
 import IncidentCard from "../Cards/IncidentCard";
 import StatsCard from "../Cards/StatsCard";
-import { Hospital } from '../../../types/user.types';
 import IncidentMap from "../Maps/IncidentMap";
 import {
   TruckIcon,
@@ -21,15 +20,15 @@ const HospitalDashboard: React.FC = () => {
   const { user } = useAuth();
   const { socket, connected, on, off } = useSocket();
   const navigate = useNavigate();
-  
+
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [stats, setStats] = useState({
     totalIncidents: 0,
     activeIncidents: 0,
     pendingIncidents: 0,
-    availableAmbulances: 5,
-    activeResponders: 8,
-    avgResponseTime: 12,
+    availableAmbulances: 0,
+    activeResponders: 0,
+    avgResponseTime: 0,
   });
   const [loading, setLoading] = useState(true);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
@@ -38,7 +37,6 @@ const HospitalDashboard: React.FC = () => {
     fetchIncidents();
     fetchStats();
 
-    // Listen for new incidents
     if (socket && connected) {
       on('new-incident', handleNewIncident);
       on('incident-update', handleIncidentUpdate);
@@ -52,8 +50,23 @@ const HospitalDashboard: React.FC = () => {
 
   const fetchIncidents = async () => {
     try {
-      const data = await emergencyService.getActiveIncidents({ status: 'pending,detected,confirmed' });
-      setIncidents(data);
+      const list = await emergencyService.getActiveIncidents({
+        status: 'pending,reported,assigned,responding',
+      });
+
+      setIncidents(list);
+
+      // Derive counts directly from the real incident list
+      setStats(prev => ({
+        ...prev,
+        totalIncidents: list.length,
+        activeIncidents: list.filter((i: Incident) =>
+          ['assigned', 'responding'].includes(i.status)
+        ).length,
+        pendingIncidents: list.filter((i: Incident) =>
+          ['pending', 'reported'].includes(i.status)
+        ).length,
+      }));
     } catch (error) {
       console.error('Failed to fetch incidents:', error);
       toast.error('Failed to load incidents');
@@ -65,12 +78,14 @@ const HospitalDashboard: React.FC = () => {
   const fetchStats = async () => {
     try {
       const data = await emergencyService.getIncidentStats();
-      if (data && typeof data === "object") {
-  setStats(prev => ({
-  ...prev,
-  ...(typeof data === "object" ? data : {})
-}));
-}
+      if (data && typeof data === 'object') {
+        setStats(prev => ({
+          ...prev,
+          availableAmbulances: data.availableAmbulances ?? prev.availableAmbulances,
+          activeResponders: data.activeResponders ?? prev.activeResponders,
+          avgResponseTime: data.avgResponseTime ?? prev.avgResponseTime,
+        }));
+      }
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
@@ -78,12 +93,15 @@ const HospitalDashboard: React.FC = () => {
 
   const handleNewIncident = (incident: Incident) => {
     setIncidents(prev => [incident, ...prev]);
-    toast.error(`🚨 New accident reported at ${incident.timestamp && new Date(incident.timestamp).toLocaleTimeString()}`, {
-      duration: 0,
-      icon: '🚨',
-    });
-    
-    // Play notification sound
+    setStats(prev => ({
+      ...prev,
+      totalIncidents: prev.totalIncidents + 1,
+      pendingIncidents: prev.pendingIncidents + 1,
+    }));
+    toast.error(
+      `🚨 New accident reported at ${incident.timestamp && new Date(incident.timestamp).toLocaleTimeString()}`,
+      { duration: 0, icon: '🚨' }
+    );
     const audio = new Audio('/sounds/notification.mp3');
     audio.play().catch(e => console.log('Audio play failed:', e));
   };
@@ -111,7 +129,7 @@ const HospitalDashboard: React.FC = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emergency-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emergency-600" />
       </div>
     );
   }
@@ -126,7 +144,8 @@ const HospitalDashboard: React.FC = () => {
               Hospital Emergency Dashboard
             </h1>
             <p className="text-gray-600 mt-1">
-           {(user as any)?.hospitalName || 'City General Hospital'}            </p>
+              {(user as any)?.hospitalName || 'City General Hospital'}
+            </p>
           </div>
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">

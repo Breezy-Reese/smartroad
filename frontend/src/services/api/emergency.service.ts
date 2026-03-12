@@ -4,12 +4,12 @@ import {
   CreateIncidentDto,
   UpdateIncidentDto,
   IncidentReport,
-  IncidentStatus
+  IncidentStats,
 } from '../../types/emergency.types';
 import { Coordinates } from '../../types/location.types';
 
 class EmergencyService {
-  private baseUrl = '/incidents'; // ← corrected from /emergency to /incidents
+  private baseUrl = '/incidents';
 
   async createEmergency(data: CreateIncidentDto): Promise<Incident> {
     const response = await axiosInstance.post<Incident>(`${this.baseUrl}`, data);
@@ -32,8 +32,10 @@ class EmergencyService {
     lng?: number;
     status?: string;
   }): Promise<Incident[]> {
-    const response = await axiosInstance.get<Incident[]>(`${this.baseUrl}/active`, { params });
-    return response.data;
+    const response = await axiosInstance.get(`${this.baseUrl}/active`, { params });
+    const data = response.data;
+    // Handle both { data: [...] } and direct array responses
+    return Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
   }
 
   async updateIncident(incidentId: string, data: UpdateIncidentDto): Promise<Incident> {
@@ -62,8 +64,8 @@ class EmergencyService {
     return response.data;
   }
 
-  async getIncidentStats(params?: any): Promise<IncidentStatus> {
-    const response = await axiosInstance.get<IncidentStatus>(`${this.baseUrl}/stats`, { params });
+  async getIncidentStats(params?: any): Promise<IncidentStats> {
+    const response = await axiosInstance.get<IncidentStats>(`${this.baseUrl}/stats`, { params });
     return response.data;
   }
 
@@ -84,10 +86,10 @@ class EmergencyService {
   }
 
   async getEmergencyContacts(): Promise<any[]> {
-  const response = await axiosInstance.get('/users/emergency-contacts');
-  const data = response.data;
-  return Array.isArray(data) ? data : data?.data || [];
-}
+    const response = await axiosInstance.get('/users/emergency-contacts');
+    const data = response.data;
+    return Array.isArray(data) ? data : data?.data || [];
+  }
 
   async addEmergencyContact(data: any): Promise<any> {
     const response = await axiosInstance.post('/users/emergency-contacts', data);

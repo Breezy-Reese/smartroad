@@ -23,7 +23,11 @@ import DriverProfile from './components/common/driver/Dashboard/Profile/DriverPr
 // Hospital Components
 import HospitalDashboard from './components/common/hospital/HospitalDashboard';
 import IncidentList from './components/common/hospital/IncidentList';
-
+import AmbulanceList from './components/common/hospital/Ambulances/AmbulanceList';
+import ResponderList from './components/common/hospital/Responders/ResponderList';
+import ResponseAnalytics from './components/common/hospital/Analytics/ResponseAnalytics';
+import HospitalProfile from './components/common/hospital/Settings/HospitalProfile';
+import HospitalIncidents from './components/common/hospital/Incidents/HospitalIncidents';
 // Admin Components
 import AdminDashboard from './components/common/admin/Dashboard/AdminDashboard';
 import UserManagement from './components/common/admin/Users/UserManagement';
@@ -84,10 +88,19 @@ const App: React.FC = () => {
               <Route path="/driver/contacts" element={<ProtectedRoute allowedRoles={['driver']}><EmergencyContacts /></ProtectedRoute>} />
               <Route path="/driver/trips" element={<ProtectedRoute allowedRoles={['driver']}><TripHistory /></ProtectedRoute>} />
               <Route path="/driver/profile" element={<ProtectedRoute allowedRoles={['driver']}><DriverProfile /></ProtectedRoute>} />
+
               {/* Hospital Routes */}
               <Route path="/hospital" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><HospitalDashboard /></ProtectedRoute>} />
               <Route path="/hospital/incidents" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><IncidentList /></ProtectedRoute>} />
-
+              <Route path="/hospital/responders" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><ResponderList /></ProtectedRoute>} />
+              <Route path="/hospital/ambulances" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><AmbulanceList /></ProtectedRoute>} />
+              <Route path="/hospital/analytics" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><ResponseAnalytics /></ProtectedRoute>} />
+              <Route path="/hospital/settings" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><HospitalProfile /></ProtectedRoute>} />
+              <Route path="/hospital/incidents" element={
+  <ProtectedRoute allowedRoles={['hospital', 'admin']}>
+    <HospitalIncidents />
+  </ProtectedRoute>
+} />
               {/* Admin Routes */}
               <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
               <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin']}><UserManagement /></ProtectedRoute>} />

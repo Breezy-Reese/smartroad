@@ -217,21 +217,31 @@ export const getSystemHealth = async (_req: Request, res: Response) => {
 };
 
 // ─── System Reports ───────────────────────────────────────────────────────────
-
 export const getSystemReports = async (_req: Request, res: Response) => {
   try {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
+    // Helper: converts [{_id: 'x', count: 5}] → { x: 5 }
+    const toRecord = (arr: { _id: string; count: number }[]) =>
+      arr.reduce((acc, { _id, count }) => {
+        acc[_id ?? 'unknown'] = count;
+        return acc;
+      }, {} as Record<string, number>);
+
     const [
-      incidentsByStatus,
-      incidentsBySeverity,
-      incidentsByType,
+      incidentsByStatusRaw,
+      incidentsBySeverityRaw,
+      incidentsByTypeRaw,
+      totalIncidents,
+      resolvedIncidents,
       newUsersThisMonth,
       incidentsThisMonth,
     ] = await Promise.all([
       Incident.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
       Incident.aggregate([{ $group: { _id: '$severity', count: { $sum: 1 } } }]),
       Incident.aggregate([{ $group: { _id: '$type', count: { $sum: 1 } } }]),
+      Incident.countDocuments(),
+      Incident.countDocuments({ status: 'resolved' }),
       User.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
       Incident.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
     ]);
@@ -239,9 +249,11 @@ export const getSystemReports = async (_req: Request, res: Response) => {
     return res.json({
       success: true,
       data: {
-        incidentsByStatus,
-        incidentsBySeverity,
-        incidentsByType,
+        totalIncidents,
+        resolvedIncidents,
+        incidentsByStatus: toRecord(incidentsByStatusRaw),
+        incidentsBySeverity: toRecord(incidentsBySeverityRaw),
+        incidentsByType: toRecord(incidentsByTypeRaw),
         newUsersThisMonth,
         incidentsThisMonth,
       },

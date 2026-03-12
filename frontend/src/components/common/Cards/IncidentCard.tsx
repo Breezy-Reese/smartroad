@@ -100,12 +100,11 @@ const IncidentCard: React.FC<IncidentCardProps> = ({
             <MapPinIcon className="h-5 w-5 flex-shrink-0 mt-0.5" />
 
             <div>
-              <p className="text-sm font-medium">
-                Lat:{' '}
-                {incident.location?.lat?.toFixed(6) || '0.000000'}
-                , Lng:{' '}
-                {incident.location?.lng?.toFixed(6) || '0.000000'}
-              </p>
+            <p className="text-sm font-medium">
+  {(incident as any).locationAddress || 
+    `${((incident.location as any)?.coordinates?.[1])?.toFixed(4) ?? 'N/A'}, 
+     ${((incident.location as any)?.coordinates?.[0])?.toFixed(4) ?? 'N/A'}`}
+</p>
 
               {incident.locationAddress && (
                 <p className="text-xs text-gray-500">
@@ -122,7 +121,7 @@ const IncidentCard: React.FC<IncidentCardProps> = ({
           <div className="flex items-center space-x-2 text-gray-600">
             <UserIcon className="h-4 w-4" />
             <span className="text-sm">
-              {incident.driverId || 'Unknown Driver'}
+              {(incident as any).driverName || 'Unknown Driver'}
             </span>
           </div>
 

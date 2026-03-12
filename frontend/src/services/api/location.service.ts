@@ -8,11 +8,7 @@ class LocationService {
     await axiosInstance.post(`${this.baseUrl}/update`, data);
   }
 
-  async getDriverLocation(driverId: string): Promise<DriverLocation> {
-    const response = await axiosInstance.get<DriverLocation>(`${this.baseUrl}/driver/${driverId}`);
-    return response.data;
-  }
-
+  
   async getDriverHistory(driverId: string, params?: {
     startDate?: Date;
     endDate?: Date;

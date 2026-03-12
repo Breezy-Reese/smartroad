@@ -263,19 +263,16 @@ export class IncidentService {
     limit?: number;
   }): Promise<IIncident[]> {
     try {
-      const query: any = {
-        status: { $in: params.status || [
-          'pending',
-          'detected',
-          'confirmed',
-          'dispatched',
-          'en-route',
-        ] },
-      };
+      // ✅ Fix
+const query: any = {};
 
-      if (params.severity?.length) {
-        query.severity = { $in: params.severity };
-      }
+if (params.status?.length) {
+  query.status = { $in: params.status };
+}
+
+if (params.severity?.length) {
+  query.severity = { $in: params.severity };
+}
 
       const incidents = await Incident.find(query)
         .sort({ severity: -1, detectedAt: -1 })

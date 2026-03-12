@@ -40,11 +40,11 @@ export type ResponderStatus =
 export interface Location {
   latitude: number;
   longitude: number;
-
-  // compatibility with map libraries
+  // compatibility aliases for map libraries
   lat?: number;
   lng?: number;
 }
+
 export interface ResponderInfo {
   id: string;
   name: string;
@@ -98,6 +98,19 @@ export interface Incident {
 }
 
 // ----------------------
+// STATS
+// ----------------------
+
+export interface IncidentStats {
+  totalIncidents: number;
+  activeIncidents: number;
+  pendingIncidents: number;
+  availableAmbulances?: number;
+  activeResponders?: number;
+  avgResponseTime?: number;
+}
+
+// ----------------------
 // DTOs (for API requests)
 // ----------------------
 
@@ -117,6 +130,7 @@ export interface UpdateIncidentDto {
   status?: IncidentStatus;
   location?: Location;
 }
+
 export interface IncidentReport {
   incidentId: string;
   message: string;

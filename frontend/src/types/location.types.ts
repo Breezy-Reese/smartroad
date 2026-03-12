@@ -1,7 +1,9 @@
 /* ================= COORDINATES ================= */
 export interface Coordinates {
-  lat: number;
-  lng: number;
+  lat: number;        // required
+  lng: number;        // required
+  latitude?: number;  // optional backend alias
+  longitude?: number; // optional backend alias
 }
 
 /* ================= LOCATION DATA ================= */
@@ -13,7 +15,7 @@ export interface LocationData {
   heading?: number;
   altitude?: number;
   altitudeAccuracy?: number;
-  timestamp: Date | string; // ISO string or Date object
+  timestamp: Date | string;
 }
 
 /* ================= DRIVER LOCATION ================= */
@@ -84,6 +86,19 @@ export interface Trip {
   status: 'pending' | 'active' | 'completed' | 'cancelled';
   createdAt?: Date | string;
   completedAt?: Date | string;
-  waypoints?: Coordinates[]; // optional
-  startedAt?: Date | string; // optional
+  waypoints?: Coordinates[];
+  startedAt?: Date | string;
+}
+
+/* ================= HELPER ================= */
+// Accepts both Coordinates (lat/lng) and Location (latitude/longitude) shapes
+export function normalizeCoordinates(raw: any): Coordinates {
+  const lat = raw?.lat ?? raw?.latitude;
+  const lng = raw?.lng ?? raw?.longitude;
+
+  if (lat === undefined || lng === undefined || isNaN(Number(lat)) || isNaN(Number(lng))) {
+    throw new Error(`Invalid coordinates: ${JSON.stringify(raw)}`);
+  }
+
+  return { lat: Number(lat), lng: Number(lng) };
 }
