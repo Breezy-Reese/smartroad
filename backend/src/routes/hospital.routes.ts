@@ -101,6 +101,17 @@ router.get(
   hospitalController.getHospitalAnalytics
 );
 
+// Add this route to hospital.routes.ts
+// Place it in the ANALYTICS & STATISTICS section, before the /:hospitalId/stats route
+
+router.get(
+  '/stats',
+  authenticate,
+  requireHospital,
+  hospitalController.getHospitalStats
+);
+
+
 // Admin-only analytics for any hospital
 router.get(
   '/:hospitalId/stats',

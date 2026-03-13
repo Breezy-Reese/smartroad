@@ -1,3 +1,4 @@
+import { Ambulance } from '../models/Ambulance.model';
 import { Request, Response } from 'express';
 import { User } from '../models/User.model';
 import { Incident } from '../models/Incident.model';
@@ -396,6 +397,65 @@ export const getNearbyHospitals = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Get nearby hospitals error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+/* ============================================================
+   GET HOSPITAL STATS
+   Replace the existing getHospitalStats function in hospital.controller.ts
+   Also add this import at the top of hospital.controller.ts:
+   import { Ambulance } from '../models/Ambulance.model';
+============================================================ */
+export const getHospitalStats = async (req: AuthRequest, res: Response) => {
+  try {
+    const hospitalId = req.user?._id;
+
+    if (!hospitalId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    // HospitalStats for beds and response time
+    const stats = await HospitalStats.findOne({ hospitalId });
+
+    // Count directly from Ambulance collection
+    const availableAmbulances = await Ambulance.countDocuments({
+      status: 'available',
+      isActive: true,
+    });
+
+    const totalAmbulances = await Ambulance.countDocuments({
+      isActive: true,
+    });
+
+    // Count responders from User collection
+    const availableResponders = await User.countDocuments({
+      hospitalId,
+      role: 'responder',
+      isActive: true,
+      'responderStatus.isAvailable': true,
+    });
+
+    const totalResponders = await User.countDocuments({
+      hospitalId,
+      role: 'responder',
+      isActive: true,
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        availableAmbulances,
+        totalAmbulances,
+        // Fall back to totalResponders if none marked available
+        availableResponders: availableResponders || totalResponders,
+        availableBeds:       stats?.availableBeds ?? 0,
+        activeIncidents:     stats?.activeIncidents ?? 0,
+        averageResponseTime: stats?.averageResponseTime ?? 0,
+        lastUpdated:         stats?.lastUpdated ?? new Date(),
+      },
+    });
+  } catch (error: any) {
+    logger.error('Get hospital stats error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };

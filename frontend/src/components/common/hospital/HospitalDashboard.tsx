@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useSocket } from '../../../hooks/useSocket';
 import { emergencyService } from '../../../services/api/emergency.service';
+import { hospitalService } from '../../../services/api/hospital.service';
 import IncidentCard from "../Cards/IncidentCard";
 import StatsCard from "../Cards/StatsCard";
 import IncidentMap from "../Maps/IncidentMap";
@@ -35,7 +36,7 @@ const HospitalDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchIncidents();
-    fetchStats();
+    fetchHospitalStats();
 
     if (socket && connected) {
       on('new-incident', handleNewIncident);
@@ -50,18 +51,13 @@ const HospitalDashboard: React.FC = () => {
 
   const fetchIncidents = async () => {
     try {
-      const list = await emergencyService.getActiveIncidents({
-        status: 'pending,reported,assigned,responding',
-      });
-
+      const list = await emergencyService.getActiveIncidents({});
       setIncidents(list);
-
-      // Derive counts directly from the real incident list
       setStats(prev => ({
         ...prev,
         totalIncidents: list.length,
         activeIncidents: list.filter((i: Incident) =>
-          ['assigned', 'responding'].includes(i.status)
+          ['assigned', 'responding', 'dispatched'].includes(i.status)
         ).length,
         pendingIncidents: list.filter((i: Incident) =>
           ['pending', 'reported'].includes(i.status)
@@ -75,21 +71,21 @@ const HospitalDashboard: React.FC = () => {
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      const data = await emergencyService.getIncidentStats();
-      if (data && typeof data === 'object') {
-        setStats(prev => ({
-          ...prev,
-          availableAmbulances: data.availableAmbulances ?? prev.availableAmbulances,
-          activeResponders: data.activeResponders ?? prev.activeResponders,
-          avgResponseTime: data.avgResponseTime ?? prev.avgResponseTime,
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to fetch stats:', error);
-    }
-  };
+  const fetchHospitalStats = async () => {
+  try {
+    console.log('Fetching hospital stats...'); // ← add
+    const data = await hospitalService.getHospitalStats();
+    console.log('Hospital stats:', data); // ← add
+    setStats(prev => ({
+      ...prev,
+      availableAmbulances: data.availableAmbulances ?? 0,
+      activeResponders:    data.availableResponders ?? 0,
+      avgResponseTime:     Math.round(data.averageResponseTime ?? 0),
+    }));
+  } catch (error) {
+    console.error('Failed to fetch hospital stats:', error);
+  }
+};
 
   const handleNewIncident = (incident: Incident) => {
     setIncidents(prev => [incident, ...prev]);
@@ -117,6 +113,7 @@ const HospitalDashboard: React.FC = () => {
       await emergencyService.acceptIncident(incidentId, user?._id || '', 'responder1', 10);
       toast.success('Incident accepted. Dispatching ambulance...');
       fetchIncidents();
+      fetchHospitalStats();
     } catch (error) {
       toast.error('Failed to accept incident');
     }
@@ -140,9 +137,7 @@ const HospitalDashboard: React.FC = () => {
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Hospital Emergency Dashboard
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-900">Hospital Emergency Dashboard</h1>
             <p className="text-gray-600 mt-1">
               {(user as any)?.hospitalName || 'City General Hospital'}
             </p>
@@ -150,9 +145,7 @@ const HospitalDashboard: React.FC = () => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <div className={`w-3 h-3 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-              <span className="text-sm text-gray-600">
-                {connected ? 'Live' : 'Disconnected'}
-              </span>
+              <span className="text-sm text-gray-600">{connected ? 'Live' : 'Disconnected'}</span>
             </div>
             <button
               onClick={() => navigate('/hospital/incidents')}
@@ -166,55 +159,18 @@ const HospitalDashboard: React.FC = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatsCard
-          title="Total Incidents"
-          value={stats.totalIncidents}
-          icon={BellIcon}
-          color="emergency"
-        />
-        <StatsCard
-          title="Active"
-          value={stats.activeIncidents}
-          icon={TruckIcon}
-          color="warning"
-        />
-        <StatsCard
-          title="Pending"
-          value={stats.pendingIncidents}
-          icon={ClockIcon}
-          color="info"
-        />
-        <StatsCard
-          title="Ambulances"
-          value={stats.availableAmbulances}
-          icon={TruckIcon}
-          color="success"
-          trend={{ value: 2, label: 'available', positive: true }}
-        />
-        <StatsCard
-          title="Responders"
-          value={stats.activeResponders}
-          icon={UserGroupIcon}
-          color="hospital"
-        />
-        <StatsCard
-          title="Avg Response"
-          value={`${stats.avgResponseTime} min`}
-          icon={ClockIcon}
-          color="warning"
-        />
+        <StatsCard title="Total Incidents" value={stats.totalIncidents} icon={BellIcon} color="emergency" />
+        <StatsCard title="Active" value={stats.activeIncidents} icon={TruckIcon} color="warning" />
+        <StatsCard title="Pending" value={stats.pendingIncidents} icon={ClockIcon} color="info" />
+        <StatsCard title="Ambulances" value={stats.availableAmbulances} icon={TruckIcon} color="success" trend={{ value: 2, label: 'available', positive: true }} />
+        <StatsCard title="Responders" value={stats.activeResponders} icon={UserGroupIcon} color="hospital" />
+        <StatsCard title="Avg Response" value={`${stats.avgResponseTime} min`} icon={ClockIcon} color="warning" />
       </div>
 
       {/* Live Map */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h2 className="text-lg font-semibold mb-4">Live Incidents Map</h2>
-        <IncidentMap
-          incidents={incidents}
-          onMarkerClick={handleMarkerClick}
-          selectedIncident={selectedIncident}
-          showRadius={true}
-          radius={10}
-        />
+        <IncidentMap incidents={incidents} onMarkerClick={handleMarkerClick} selectedIncident={selectedIncident} showRadius={true} radius={10} />
       </div>
 
       {/* Active Incidents */}
@@ -228,21 +184,13 @@ const HospitalDashboard: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {incidents.slice(0, 4).map((incident) => (
-            <IncidentCard
-              key={incident._id}
-              incident={incident}
-              onAccept={handleAcceptIncident}
-              showActions={true}
-            />
+            <IncidentCard key={incident._id} incident={incident} onAccept={handleAcceptIncident} showActions={true} />
           ))}
         </div>
 
         {incidents.length > 4 && (
           <div className="mt-4 text-center">
-            <button
-              onClick={() => navigate('/hospital/incidents')}
-              className="text-emergency-600 hover:text-emergency-700 font-medium"
-            >
+            <button onClick={() => navigate('/hospital/incidents')} className="text-emergency-600 hover:text-emergency-700 font-medium">
               View all {incidents.length} incidents →
             </button>
           </div>
@@ -252,37 +200,26 @@ const HospitalDashboard: React.FC = () => {
           <div className="text-center py-12">
             <BellIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Active Incidents</h3>
-            <p className="text-gray-500">
-              There are no active incidents at the moment. The dashboard will update in real-time when new incidents occur.
-            </p>
+            <p className="text-gray-500">There are no active incidents at the moment. The dashboard will update in real-time when new incidents occur.</p>
           </div>
         )}
       </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <button
-          onClick={() => navigate('/hospital/ambulances')}
-          className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow text-left"
-        >
+        <button onClick={() => navigate('/hospital/ambulances')} className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow text-left">
           <TruckIcon className="h-8 w-8 text-emergency-600 mb-3" />
           <h3 className="font-semibold mb-1">Manage Ambulances</h3>
           <p className="text-sm text-gray-600">Track and dispatch ambulances</p>
         </button>
 
-        <button
-          onClick={() => navigate('/hospital/responders')}
-          className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow text-left"
-        >
+        <button onClick={() => navigate('/hospital/responders')} className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow text-left">
           <UserGroupIcon className="h-8 w-8 text-emergency-600 mb-3" />
           <h3 className="font-semibold mb-1">Responder Team</h3>
           <p className="text-sm text-gray-600">View and manage responders</p>
         </button>
 
-        <button
-          onClick={() => navigate('/hospital/analytics')}
-          className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow text-left"
-        >
+        <button onClick={() => navigate('/hospital/analytics')} className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow text-left">
           <BuildingOfficeIcon className="h-8 w-8 text-emergency-600 mb-3" />
           <h3 className="font-semibold mb-1">Analytics & Reports</h3>
           <p className="text-sm text-gray-600">View performance metrics</p>
