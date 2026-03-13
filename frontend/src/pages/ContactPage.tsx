@@ -3,143 +3,135 @@ import { EnvelopeIcon, PhoneIcon, MapPinIcon } from '@heroicons/react/24/outline
 import { toast } from 'react-hot-toast';
 
 const ContactPage: React.FC = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    subject: '',
-    message: '',
-  });
+  const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-
-    // Simulate API call
     setTimeout(() => {
-      toast.success('Message sent successfully! We\'ll get back to you soon.');
-      setFormData({
-        name: '',
-        email: '',
-        subject: '',
-        message: '',
-      });
+      toast.success("Message sent! We'll get back to you soon.");
+      setFormData({ name: '', email: '', subject: '', message: '' });
       setSubmitting(false);
     }, 1500);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Contact Us</h1>
-          <p className="text-xl text-gray-600">
+    <div className="min-h-screen bg-gray-50">
+
+      {/* ─── HERO ─── */}
+      <section className="relative bg-gradient-to-br from-red-900 via-red-800 to-gray-900 py-24 overflow-hidden">
+        <div className="absolute inset-0 bg-black/30" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-white/5 rounded-full" />
+        <div className="relative z-10 max-w-7xl mx-auto px-6 text-center text-white">
+          <div className="flex items-center justify-center gap-3 mb-5">
+            <div className="h-px w-8 bg-red-400" />
+            <span className="text-xs font-semibold tracking-[.2em] uppercase text-red-400">Get In Touch</span>
+            <div className="h-px w-8 bg-red-400" />
+          </div>
+          <h1 className="text-4xl md:text-6xl font-black mb-4 tracking-tight">
+            Contact <span className="text-red-400">Us</span>
+          </h1>
+          <p className="text-xl text-red-100 max-w-2xl mx-auto leading-relaxed">
             Get in touch with our team for any questions or support
           </p>
         </div>
+      </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-          <div className="bg-white rounded-lg shadow-lg p-6 text-center">
-            <div className="bg-emergency-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
-              <PhoneIcon className="h-6 w-6 text-emergency-600" />
-            </div>
-            <h3 className="font-semibold mb-2">Emergency Support</h3>
-            <p className="text-emergency-600 font-bold text-xl">+254 700 000 000</p>
-            <p className="text-sm text-gray-500 mt-2">24/7 available</p>
-          </div>
+      <div className="max-w-7xl mx-auto px-6 py-20">
 
-          <div className="bg-white rounded-lg shadow-lg p-6 text-center">
-            <div className="bg-emergency-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
-              <EnvelopeIcon className="h-6 w-6 text-emergency-600" />
+        {/* ─── CONTACT CARDS ─── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-14">
+          {[
+            {
+              icon: <PhoneIcon className="h-6 w-6 text-red-600" />,
+              title: 'Emergency Support',
+              primary: '+254 700 000 000',
+              sub: '24/7 available',
+            },
+            {
+              icon: <EnvelopeIcon className="h-6 w-6 text-red-600" />,
+              title: 'Email Us',
+              primary: 'support@sads.co.ke',
+              sub: 'info@sads.co.ke',
+            },
+            {
+              icon: <MapPinIcon className="h-6 w-6 text-red-600" />,
+              title: 'Visit Us',
+              primary: '123 Tech Park, Nairobi',
+              sub: 'Kenya',
+            },
+          ].map((card, i) => (
+            <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center hover:shadow-md hover:-translate-y-1 transition-all">
+              <div className="bg-red-50 border border-red-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5">
+                {card.icon}
+              </div>
+              <h3 className="font-bold text-gray-900 mb-2">{card.title}</h3>
+              <p className="text-red-600 font-bold text-lg mb-1">{card.primary}</p>
+              <p className="text-sm text-gray-400">{card.sub}</p>
             </div>
-            <h3 className="font-semibold mb-2">Email Us</h3>
-            <p className="text-emergency-600">support@accident-detection.com</p>
-            <p className="text-sm text-gray-500 mt-2">info@accident-detection.com</p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-lg p-6 text-center">
-            <div className="bg-emergency-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
-              <MapPinIcon className="h-6 w-6 text-emergency-600" />
-            </div>
-            <h3 className="font-semibold mb-2">Visit Us</h3>
-            <p className="text-gray-600">123 Tech Park, Nairobi</p>
-            <p className="text-gray-600">Kenya</p>
-          </div>
+          ))}
         </div>
 
-        <div className="bg-white rounded-lg shadow-xl p-8">
-          <h2 className="text-2xl font-bold mb-6">Send us a Message</h2>
+        {/* ─── FORM ─── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10">
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-px w-8 bg-red-600" />
+              <span className="text-xs font-bold tracking-[.2em] uppercase text-red-600">Message Us</span>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-black text-gray-900">Send us a Message</h2>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Your Name *
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Your Name *</label>
                 <input
-                  type="text"
-                  name="name"
-                  required
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emergency-500"
+                  type="text" name="name" required value={formData.name} onChange={handleChange}
+                  placeholder="Dr. James Mwangi"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address *
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address *</label>
                 <input
-                  type="email"
-                  name="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emergency-500"
+                  type="email" name="email" required value={formData.email} onChange={handleChange}
+                  placeholder="james@hospital.co.ke"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Subject *
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Subject *</label>
               <input
-                type="text"
-                name="subject"
-                required
-                value={formData.subject}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emergency-500"
+                type="text" name="subject" required value={formData.subject} onChange={handleChange}
+                placeholder="Partnership inquiry / Technical support / General"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-400"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Message *
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Message *</label>
               <textarea
-                name="message"
-                required
-                rows={6}
-                value={formData.message}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emergency-500"
-              ></textarea>
+                name="message" required rows={6} value={formData.message} onChange={handleChange}
+                placeholder="Tell us how we can help..."
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all resize-none text-gray-900 placeholder-gray-400"
+              />
             </div>
 
             <button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-emergency-600 text-white py-3 rounded-lg font-semibold hover:bg-emergency-700 disabled:opacity-50 transition-colors"
+              type="submit" disabled={submitting}
+              className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white py-3.5 rounded-xl font-bold text-base transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-red-600/25 flex items-center justify-center gap-2"
             >
-              {submitting ? 'Sending...' : 'Send Message'}
+              {submitting ? (
+                <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending...</>
+              ) : 'Send Message'}
             </button>
           </form>
         </div>

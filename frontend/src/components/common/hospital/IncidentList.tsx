@@ -8,6 +8,7 @@ import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
+import SeverityBadge from '../SeverityBadge';
 
 const IncidentList: React.FC = () => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -41,55 +42,30 @@ const IncidentList: React.FC = () => {
 
   const applyFilters = () => {
     let filtered = [...incidents];
-
-    if (filters.status) {
-      filtered = filtered.filter(inc => inc.status === filters.status);
-    }
-    if (filters.severity) {
-      filtered = filtered.filter(inc => inc.severity === filters.severity);
-    }
+    if (filters.status)    filtered = filtered.filter(inc => inc.status === filters.status);
+    if (filters.severity)  filtered = filtered.filter(inc => inc.severity === filters.severity);
     if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
+      const s = filters.search.toLowerCase();
       filtered = filtered.filter(inc =>
-        (inc.incidentId ?? '').toLowerCase().includes(searchLower) ||
-        inc.driverId?.toLowerCase().includes(searchLower) ||
-        inc.vehicleNumber?.toLowerCase().includes(searchLower)
+        (inc.incidentId ?? '').toLowerCase().includes(s) ||
+        inc.driverId?.toLowerCase().includes(s) ||
+        inc.vehicleNumber?.toLowerCase().includes(s)
       );
     }
-    if (filters.startDate) {
-      filtered = filtered.filter(inc =>
-        new Date(inc.timestamp ?? new Date()) >= new Date(filters.startDate)
-      );
-    }
-    if (filters.endDate) {
-      filtered = filtered.filter(inc =>
-        new Date(inc.timestamp ?? new Date()) <= new Date(filters.endDate)
-      );
-    }
-
+    if (filters.startDate) filtered = filtered.filter(inc => new Date(inc.timestamp ?? new Date()) >= new Date(filters.startDate));
+    if (filters.endDate)   filtered = filtered.filter(inc => new Date(inc.timestamp ?? new Date()) <= new Date(filters.endDate));
     setFilteredIncidents(filtered);
-  };
-
-  const getSeverityColor = (severity: string) => {
-    const colors: Record<string, string> = {
-      low: 'bg-blue-100 text-blue-800',
-      medium: 'bg-yellow-100 text-yellow-800',
-      high: 'bg-orange-100 text-orange-800',
-      critical: 'bg-red-100 text-red-800',
-      fatal: 'bg-black text-white',
-    };
-    return colors[severity] || 'bg-gray-100 text-gray-800';
   };
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      reported: 'bg-orange-100 text-orange-800',
-      assigned: 'bg-blue-100 text-blue-800',
+      pending:    'bg-yellow-100 text-yellow-800',
+      reported:   'bg-orange-100 text-orange-800',
+      assigned:   'bg-blue-100 text-blue-800',
       responding: 'bg-purple-100 text-purple-800',
-      resolved: 'bg-green-100 text-green-800',
-      closed: 'bg-gray-100 text-gray-800',
-      cancelled: 'bg-red-100 text-red-800',
+      resolved:   'bg-green-100 text-green-800',
+      closed:     'bg-gray-100 text-gray-800',
+      cancelled:  'bg-red-100 text-red-800',
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
@@ -128,64 +104,41 @@ const IncidentList: React.FC = () => {
               className="pl-10 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emergency-500"
             />
           </div>
-
           <select
             value={filters.status}
             onChange={(e) => setFilters({ ...filters, status: e.target.value })}
             className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emergency-500"
           >
             <option value="">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="reported">Reported</option>
-            <option value="assigned">Assigned</option>
-            <option value="responding">Responding</option>
-            <option value="resolved">Resolved</option>
-            <option value="closed">Closed</option>
-            <option value="cancelled">Cancelled</option>
+            {['pending','reported','assigned','responding','resolved','closed','cancelled'].map(s => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
           </select>
-
           <select
             value={filters.severity}
             onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
             className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emergency-500"
           >
             <option value="">All Severity</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-            <option value="fatal">Fatal</option>
+            {['low','medium','high','critical','fatal'].map(s => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
           </select>
-
-          <input
-            type="date"
-            value={filters.startDate}
-            onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emergency-500"
-          />
-
-          <input
-            type="date"
-            value={filters.endDate}
-            onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emergency-500"
-          />
+          <input type="date" value={filters.startDate} onChange={(e) => setFilters({ ...filters, startDate: e.target.value })} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emergency-500" />
+          <input type="date" value={filters.endDate}   onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emergency-500" />
         </div>
 
-        {/* Results count */}
         <div className="mb-4 text-sm text-gray-600">
           Showing {filteredIncidents.length} of {incidents.length} incidents
         </div>
 
-        {/* Incidents Table */}
+        {/* Table */}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {['Incident ID', 'Time', 'Location', 'Severity', 'Status', 'Driver', 'Responders', 'Actions'].map(h => (
-                  <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {h}
-                  </th>
+                {['Incident ID', 'Time', 'Location', 'Severity Score', 'Status', 'Driver', 'Responders', 'Actions'].map(h => (
+                  <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -204,9 +157,12 @@ const IncidentList: React.FC = () => {
                        ${(incident.location?.longitude ?? incident.location?.lng)?.toFixed(4) ?? 'N/A'}`}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSeverityColor(incident.severity)}`}>
-                      {incident.severity}
-                    </span>
+                    <SeverityBadge
+                      severity={incident.severity}
+                      status={incident.status}
+                      timestamp={incident.timestamp}
+                      showScore={false}
+                    />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(incident.status)}`}>

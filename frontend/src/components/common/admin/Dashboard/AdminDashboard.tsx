@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { axiosInstance } from '../../../../config/axios.config';
+import DashboardChart from '../../../../pages/DashboardChart';
 
 interface Stats {
   totalUsers: number;
@@ -72,13 +73,13 @@ const AdminDashboard: React.FC = () => {
   );
 
   const statCards = [
-    { label: 'Total Users', value: stats?.totalUsers, color: 'bg-blue-500' },
-    { label: 'Total Incidents', value: stats?.totalIncidents, color: 'bg-purple-500' },
-    { label: 'Active Incidents', value: stats?.activeIncidents, color: 'bg-orange-500' },
-    { label: 'Resolved', value: stats?.resolvedIncidents, color: 'bg-green-500' },
-    { label: 'Drivers', value: stats?.totalDrivers, color: 'bg-sky-500' },
-    { label: 'Hospitals', value: stats?.totalHospitals, color: 'bg-teal-500' },
-    { label: 'Responders', value: stats?.totalResponders, color: 'bg-indigo-500' },
+    { label: 'Total Users',       value: stats?.totalUsers,        color: 'bg-blue-500'   },
+    { label: 'Total Incidents',   value: stats?.totalIncidents,    color: 'bg-purple-500' },
+    { label: 'Active Incidents',  value: stats?.activeIncidents,   color: 'bg-orange-500' },
+    { label: 'Resolved',          value: stats?.resolvedIncidents, color: 'bg-green-500'  },
+    { label: 'Drivers',           value: stats?.totalDrivers,      color: 'bg-sky-500'    },
+    { label: 'Hospitals',         value: stats?.totalHospitals,    color: 'bg-teal-500'   },
+    { label: 'Responders',        value: stats?.totalResponders,   color: 'bg-indigo-500' },
   ];
 
   return (
@@ -95,6 +96,11 @@ const AdminDashboard: React.FC = () => {
             <p className="text-xs text-gray-500 text-center">{card.label}</p>
           </div>
         ))}
+      </div>
+
+      {/* Analytics Charts */}
+      <div className="bg-white rounded-xl shadow overflow-hidden">
+        <DashboardChart />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
