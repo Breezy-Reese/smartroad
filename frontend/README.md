@@ -1,93 +1,235 @@
-# React + TypeScript + Vite
+Smart Accident Detection System
+Full Stack Documentation
+Version 1.0.0  |  Node.js + React + MongoDB + Socket.IO
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Project Overview
+The Smart Accident Detection System (SADS) is a real-time emergency response platform designed to detect road accidents, notify nearby hospitals, and coordinate ambulance dispatch. The system integrates IoT sensor data from vehicles, a hospital management dashboard, and live tracking — enabling faster emergency response times and saving lives.
 
-Currently, two official plugins are available:
+Built with a modern full-stack architecture:
+•	Frontend: React + TypeScript + Tailwind CSS + Vite
+•	Backend: Node.js + Express + TypeScript
+•	Database: MongoDB with Mongoose ODM
+•	Real-time: Socket.IO for live incident updates
+•	Maps: Google Maps JavaScript API
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Features
+Hospital Dashboard
+•	Real-time incident monitoring with live stats (total, active, pending)
+•	Live ambulance tracking with availability status
+•	Responder team management and dispatch
+•	Interactive incident map with severity color coding
+•	Analytics and performance reports (incidents by type, severity, status)
+•	Real-time notifications via Socket.IO
+Incident Management
+•	Automatic incident detection from vehicle sensor data
+•	Severity classification (low, medium, high, critical, fatal)
+•	Full incident lifecycle: pending → reported → assigned → responding → resolved
+•	Witness report submission
+•	Incident history with filtering by status, severity, and date range
+Ambulance Management
+•	Fleet management with status tracking (available, dispatched, maintenance, offline)
+•	Driver assignment and GPS location tracking
+•	One-click dispatch to active incidents
+Responder Management
+•	Responder availability tracking
+•	Auto-dispatch for critical and high severity incidents
+•	ETA calculation and real-time location updates
+Analytics & Reporting
+•	Incident breakdown by type, severity, and status
+•	Average response time calculation
+•	Resolution rate tracking
+•	Configurable time periods (day, week, month, year)
 
-## React Compiler
+Architecture Overview
+The system follows a three-tier architecture with real-time capabilities:
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+Layer	Technology	Responsibility
+Presentation	React + TypeScript	Hospital dashboard, incident UI, maps
+API Layer	Express + TypeScript	REST endpoints, auth middleware, validation
+Real-time	Socket.IO	Live incident updates, notifications
+Data Layer	MongoDB + Mongoose	Incidents, users, ambulances, hospital stats
+Cache	Redis	Incident caching, session management
 
-Note: This will impact Vite dev & build performances.
+Project Structure
+Frontend (src/)
+src/
+  components/         # UI components
+    Hospital/          # Hospital-specific components
+      Cards/           # StatsCard, IncidentCard
+      Dashboard/       # HospitalDashboard
+      Maps/            # IncidentMap
+      Incidents/       # IncidentList, HospitalIncidents
+  services/api/        # API service classes
+    emergency.service.ts
+    hospital.service.ts
+    location.service.ts
+  types/               # TypeScript interfaces
+    emergency.types.ts
+    location.types.ts
+  hooks/               # Custom React hooks
+    useAuth.ts, useSocket.ts
 
-## Expanding the ESLint configuration
+Backend (src/)
+src/
+  controllers/         # Route handlers
+    incident.controller.ts
+    hospital.controller.ts
+  services/            # Business logic
+    incident.service.ts
+    notification.service.ts
+    responder.service.ts
+  models/              # Mongoose schemas
+    Incident.model.ts
+    Hospital.model.ts
+    Ambulance.model.ts
+    User.model.ts
+  routes/              # Express routers
+  middleware/          # Auth, validation, rate limiting
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Installation & Setup
+Prerequisites
+•	Node.js v18+
+•	MongoDB (local or MongoDB Atlas)
+•	Redis (for caching)
+•	Google Maps API Key
+Backend Setup
+1. Clone the repository and navigate to the backend folder:
+git clone <repo-url>
+cd backend
+npm install
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+2. Create a .env file in the backend root:
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/smart-accident-detection
+JWT_SECRET=your_jwt_secret_here
+JWT_REFRESH_SECRET=your_refresh_secret_here
+REDIS_URL=redis://localhost:6379
+CLIENT_URL=http://localhost:5173
+NODE_ENV=development
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+3. Seed the database (optional):
+npm run seed
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+4. Start the backend server:
+npm run dev
+Server will start on http://localhost:5000
+Frontend Setup
+1. Navigate to the frontend folder:
+cd frontend
+npm install
 
-      ---
+2. Create a .env file in the frontend root:
+VITE_API_URL=http://localhost:5000/api
+VITE_SOCKET_URL=http://localhost:5000
+VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key_here
 
-      # SmartRoad Frontend
+3. Start the frontend dev server:
+npm run dev
+Frontend will start on http://localhost:5173
 
-      This project is the React/TypeScript frontend for a Smart Accident Detection System.
+Environment Variables
+Backend
+Variable	Description	Example
+PORT	Server port	5000
+MONGODB_URI	MongoDB connection string	mongodb://localhost:27017/sads
+JWT_SECRET	JWT signing secret	super_secret_key
+JWT_REFRESH_SECRET	Refresh token secret	refresh_secret_key
+REDIS_URL	Redis connection URL	redis://localhost:6379
+CLIENT_URL	Frontend URL for CORS	http://localhost:5173
+NODE_ENV	Environment mode	development
 
-      ## Quick start
+Frontend
+Variable	Description	Example
+VITE_API_URL	Backend API base URL	http://localhost:5000/api
+VITE_SOCKET_URL	Socket.IO server URL	http://localhost:5000
+VITE_GOOGLE_MAPS_API_KEY	Google Maps API key	AIzaSy...
 
-      ```bash
-      cd frontend
-      npm install      # install dependencies
-      npm run dev      # start Vite dev server
-      ```
+API Documentation
+Base URL: http://localhost:5000/api
+All protected routes require: Authorization: Bearer <token>
 
-      Dependencies include `axios`, `react-router-dom`, `socket.io-client` and several
-      `@types` packages.  Context providers and example pages have been added; replace
-      placeholder logic with your real application code as needed.
+Authentication
+Method	Endpoint	Description	Auth Required
+POST	/auth/register	Register a new user	No
+POST	/auth/login	Login and get tokens	No
+POST	/auth/refresh-token	Refresh access token	No
+POST	/auth/logout	Logout user	Yes
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Incidents
+Method	Endpoint	Description	Auth Required
+GET	/incidents/active	Get all active incidents	Yes (hospital/admin)
+GET	/incidents/stats	Get incident statistics	Yes (hospital/admin)
+POST	/incidents	Create a new incident	Yes (driver)
+GET	/incidents/:id	Get incident by ID	Yes
+PUT	/incidents/:id	Update incident	Yes (hospital/admin)
+POST	/incidents/:id/accept	Accept an incident	Yes (hospital)
+POST	/incidents/:id/resolve	Resolve an incident	Yes
+POST	/incidents/:id/cancel	Cancel an incident	Yes
+GET	/incidents/:id/report	Generate incident report	Yes (hospital/admin)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Hospitals
+Method	Endpoint	Description	Auth Required
+GET	/hospitals/dashboard	Get hospital dashboard data	Yes (hospital)
+GET	/hospitals/stats	Get ambulance & responder stats	Yes (hospital)
+GET	/hospitals/incidents	Get hospital incidents	Yes (hospital)
+GET	/hospitals/analytics	Get hospital analytics	Yes (hospital)
+PUT	/hospitals/capacity	Update hospital capacity	Yes (hospital)
+GET	/hospitals/nearby	Get nearby hospitals	No
+PUT	/hospitals/location	Update hospital location	Yes (hospital)
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Ambulances
+Method	Endpoint	Description	Auth Required
+GET	/ambulances	Get all ambulances	Yes
+POST	/ambulances	Add new ambulance	Yes (hospital/admin)
+PUT	/ambulances/:id/status	Update ambulance status	Yes
+DELETE	/ambulances/:id	Remove ambulance	Yes (admin)
+
+Locations
+Method	Endpoint	Description	Auth Required
+POST	/locations/update	Update driver location	Yes (driver)
+GET	/locations/driver/:id	Get driver location	Yes
+GET	/locations/nearby	Get nearby drivers	Yes
+POST	/locations/distance	Calculate distance	Yes
+
+Real-Time Socket Events
+Event	Direction	Description
+new-incident	Server → Client	Emitted when a new incident is created
+incident-update	Server → Client	Emitted when an incident status changes
+responder-location	Server → Client	Responder GPS location update
+join-room	Client → Server	Join a specific incident room
+leave-room	Client → Server	Leave an incident room
+
+Contributing Guidelines
+Getting Started
+1. Fork the repository
+2. Create a feature branch:
+git checkout -b feature/your-feature-name
+3. Make your changes following the code style guidelines below
+4. Commit your changes:
+git commit -m "feat: add your feature description"
+5. Push to your branch:
+git push origin feature/your-feature-name
+6. Open a Pull Request
+Commit Message Convention
+Follow the Conventional Commits specification:
+•	feat: new feature
+•	fix: bug fix
+•	docs: documentation changes
+•	style: formatting, missing semicolons, etc.
+•	refactor: code restructuring without feature changes
+•	test: adding or updating tests
+•	chore: build process or tooling changes
+Code Style
+•	Use TypeScript for all new files
+•	Follow existing naming conventions (camelCase for variables, PascalCase for components)
+•	Always define interfaces/types for API responses
+•	Use async/await over raw Promises
+•	Add error handling with try/catch for all async functions
+•	Keep components small and focused — extract logic into custom hooks or services
+Branch Strategy
+•	main — production-ready code
+•	develop — integration branch for features
+•	feature/* — individual feature branches
+•	fix/* — bug fix branches
+
+Smart Accident Detection System  |  Built with Node.js, React & MongoDB

@@ -5,6 +5,7 @@ class HospitalService {
 
   async getHospitalStats(): Promise<{
     availableAmbulances: number;
+    totalAmbulances: number;
     availableResponders: number;
     availableBeds: number;
     activeIncidents: number;

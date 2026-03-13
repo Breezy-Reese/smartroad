@@ -28,6 +28,7 @@ const HospitalDashboard: React.FC = () => {
     activeIncidents: 0,
     pendingIncidents: 0,
     availableAmbulances: 0,
+    totalAmbulances: 0,
     activeResponders: 0,
     avgResponseTime: 0,
   });
@@ -72,20 +73,19 @@ const HospitalDashboard: React.FC = () => {
   };
 
   const fetchHospitalStats = async () => {
-  try {
-    console.log('Fetching hospital stats...'); // ← add
-    const data = await hospitalService.getHospitalStats();
-    console.log('Hospital stats:', data); // ← add
-    setStats(prev => ({
-      ...prev,
-      availableAmbulances: data.availableAmbulances ?? 0,
-      activeResponders:    data.availableResponders ?? 0,
-      avgResponseTime:     Math.round(data.averageResponseTime ?? 0),
-    }));
-  } catch (error) {
-    console.error('Failed to fetch hospital stats:', error);
-  }
-};
+    try {
+      const data = await hospitalService.getHospitalStats();
+      setStats(prev => ({
+        ...prev,
+        availableAmbulances: data.availableAmbulances ?? 0,
+        totalAmbulances:     data.totalAmbulances ?? 0,
+        activeResponders:    data.availableResponders ?? 0,
+        avgResponseTime:     Math.round(data.averageResponseTime ?? 0),
+      }));
+    } catch (error) {
+      console.error('Failed to fetch hospital stats:', error);
+    }
+  };
 
   const handleNewIncident = (incident: Incident) => {
     setIncidents(prev => [incident, ...prev]);
@@ -162,7 +162,13 @@ const HospitalDashboard: React.FC = () => {
         <StatsCard title="Total Incidents" value={stats.totalIncidents} icon={BellIcon} color="emergency" />
         <StatsCard title="Active" value={stats.activeIncidents} icon={TruckIcon} color="warning" />
         <StatsCard title="Pending" value={stats.pendingIncidents} icon={ClockIcon} color="info" />
-        <StatsCard title="Ambulances" value={stats.availableAmbulances} icon={TruckIcon} color="success" trend={{ value: 2, label: 'available', positive: true }} />
+        <StatsCard
+          title="Ambulances"
+          value={stats.availableAmbulances}
+          icon={TruckIcon}
+          color="success"
+          trend={{ value: stats.totalAmbulances, label: 'total', positive: true }}
+        />
         <StatsCard title="Responders" value={stats.activeResponders} icon={UserGroupIcon} color="hospital" />
         <StatsCard title="Avg Response" value={`${stats.avgResponseTime} min`} icon={ClockIcon} color="warning" />
       </div>
