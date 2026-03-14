@@ -4,7 +4,7 @@ import {
   DeliveryReceipt,
   EscalationPolicy,
 } from '../../types/notification.types';
-import { NotificationPrefs } from '../../hooks/useNotifications';
+import { NotificationPrefs } from '../../hooks/timers/useNotification';
 
 class NotificationService {
   private baseUrl = '/notifications';

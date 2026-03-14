@@ -1,18 +1,18 @@
 const fs = require('fs');
-const file = 'src/components/common/Sidebar/Sidebar.tsx';
+const file = 'src/App.tsx';
 let c = fs.readFileSync(file, 'utf8');
 
-// Keep only content up to first navItems closing + first Sidebar component + export
-const navStart = c.indexOf('const navItems: NavItem[] = [');
-const sidebarStart = c.indexOf('const Sidebar: React.FC');
-const exportLine = 'export default Sidebar;';
+// Add imports
+c = c.replace(
+  "import Register from './components/common/auth/Register';",
+  "import Register from './components/common/auth/Register';\nimport ForgotPassword from './components/common/auth/ForgotPassword/ForgotPassword';\nimport ResetPassword from './components/common/auth/ForgotPassword/ResetPassword';"
+);
 
-// Find the FIRST export default
-const exportStart = c.indexOf(exportLine);
+// Add routes
+c = c.replace(
+  '<Route path="/register" element={<Register />} />',
+  '<Route path="/register" element={<Register />} />\n              <Route path="/forgot-password" element={<ForgotPassword />} />\n              <Route path="/reset-password" element={<ResetPassword />} />'
+);
 
-const clean = c.slice(0, navStart) + 
-              c.slice(navStart, sidebarStart) + 
-              c.slice(sidebarStart, exportStart + exportLine.length);
-
-fs.writeFileSync(file, clean);
-console.log('Lines:', clean.split('\n').length);
+fs.writeFileSync(file, c);
+console.log('Done');

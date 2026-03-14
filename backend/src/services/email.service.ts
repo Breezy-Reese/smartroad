@@ -1,3 +1,5 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
 import nodemailer, { Transporter } from 'nodemailer';
 import { logger } from '../utils/logger';
 

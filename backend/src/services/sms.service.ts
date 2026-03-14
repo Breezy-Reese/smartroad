@@ -19,8 +19,8 @@ class SMSService {
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
 
-    if (accountSid && authToken) {
-      this.client = twilio(accountSid, authToken);
+    if (accountSid && authToken && !accountSid.includes('your_')) {
+      try { this.client = twilio(accountSid, authToken); } catch(e) { logger.warn("Twilio init failed: " + e.message); return; }
       this.initialized = true;
       logger.info('SMS service initialized');
     } else {

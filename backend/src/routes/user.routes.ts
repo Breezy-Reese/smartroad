@@ -176,6 +176,11 @@ router.delete('/emergency-contacts/:contactId',
 );
 
 // Medical info
+router.get('/medical-info',
+  authenticate,
+  userController.getMedicalInfo,
+);
+
 router.put('/medical-info',
   authenticate,
   validate(medicalInfoValidation),
@@ -184,7 +189,6 @@ router.put('/medical-info',
 
 // ==================== DRIVER ROUTES ====================
 
-// Trip scores
 router.post('/trip-scores',
   authenticate,
   requireDriver,
@@ -203,7 +207,6 @@ router.get('/trip-scores',
   driverController.getTripScores,
 );
 
-// Preferences
 router.get('/preferences',
   authenticate,
   driverController.getPreferences,

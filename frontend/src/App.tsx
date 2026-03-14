@@ -12,6 +12,8 @@ import EmergencyLayout from './components/common/Layout/EmergencyLayout';
 // Auth
 import Login from './components/common/auth/Login';
 import Register from './components/common/auth/Register';
+import ForgotPassword from './components/common/auth/ForgotPassword/ForgotPassword';
+import ResetPassword from './components/common/auth/ForgotPassword/ResetPassword';
 import ProtectedRoute from './components/common/auth/ProtectedRoute';
 
 // Driver — existing
@@ -92,6 +94,8 @@ const App: React.FC = () => {
             <Route element={<AuthLayout />}>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
             </Route>
 
             {/* Emergency Routes */}

@@ -4,7 +4,7 @@ import { User } from '../models/User.model';
 import { Location } from '../models/Location.model';
 import { Incident } from '../models/Incident.model';
 import { logger } from '../utils/logger';
-import { emailService } from '../services/email.service'; // Fixed import
+import { emailService } from '../services/email.service';
 
 /* ============================================================
    GET USER PROFILE
@@ -38,7 +38,6 @@ export const getUserProfile = async (req: Request, res: Response) => {
       stats = { message: 'Admin users have no specific stats' };
     }
 
-    // FIX: Use toObject() to convert Mongoose document
     const userObject = (user as any).toObject ? (user as any).toObject() : user;
     return res.json({ success: true, data: { ...userObject, stats } });
   } catch (error: any) {
@@ -63,7 +62,6 @@ export const updateUserProfile = async (req: Request, res: Response) => {
 
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-    // FIX: Convert to plain object
     const userObject = (user as any).toObject ? (user as any).toObject() : user;
     return res.json({ success: true, message: 'Profile updated', data: userObject });
   } catch (error: any) {
@@ -94,7 +92,6 @@ export const changePassword = async (req: Request, res: Response) => {
     user.password = newPassword;
     await user.save();
 
-    // FIX: Use correct email service
     await emailService.sendEmail({
       to: user.email,
       subject: 'Password Changed',
@@ -150,9 +147,6 @@ export const getEmergencyContacts = async (req: Request, res: Response) => {
   }
 };
 
-/* ============================================================
-   UPDATE EMERGENCY CONTACT
-============================================================ */
 export const updateEmergencyContact = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?._id;
@@ -165,41 +159,32 @@ export const updateEmergencyContact = async (req: Request, res: Response) => {
 
     const contacts = user.emergencyContacts || [];
     const index = contacts.findIndex(c => c && c._id === contactId);
-    
+
     if (index === -1) return res.status(404).json({ success: false, error: 'Contact not found' });
 
-    // If setting as primary, remove primary from others
     if (updates.isPrimary) {
       contacts.forEach(c => { if (c) c.isPrimary = false; });
     }
 
-    // Update the contact safely
     const existingContact = contacts[index];
     if (existingContact) {
-      // Merge existing contact with updates
-      contacts[index] = { 
-        ...existingContact, 
+      contacts[index] = {
+        ...existingContact,
         ...updates,
-        _id: existingContact._id // Preserve the original _id
+        _id: existingContact._id,
       };
     }
 
     user.emergencyContacts = contacts;
     await user.save();
 
-    return res.json({ 
-      success: true, 
-      message: 'Contact updated', 
-      data: user.emergencyContacts 
-    });
+    return res.json({ success: true, message: 'Contact updated', data: user.emergencyContacts });
   } catch (error: any) {
     logger.error('Update contact error', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: error.message || 'Failed to update contact' 
-    });
+    return res.status(500).json({ success: false, error: error.message || 'Failed to update contact' });
   }
 };
+
 export const deleteEmergencyContact = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?._id;
@@ -222,6 +207,21 @@ export const deleteEmergencyContact = async (req: Request, res: Response) => {
 /* ============================================================
    MEDICAL INFO
 ============================================================ */
+export const getMedicalInfo = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?._id;
+    if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+    const user = await User.findById(userId).select('medicalInfo');
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    return res.json({ success: true, data: user.medicalInfo ?? {} });
+  } catch (error: any) {
+    logger.error('Get medical info error', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to get medical info' });
+  }
+};
+
 export const updateMedicalInfo = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?._id;
@@ -288,12 +288,7 @@ export const getAllDrivers = async (req: Request, res: Response) => {
       success: true,
       data: {
         drivers: data,
-        pagination: { 
-          page: pageNum, 
-          limit: limitNum, 
-          total, 
-          pages: Math.ceil(total / limitNum) 
-        },
+        pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) },
       },
     });
   } catch (error: any) {
@@ -359,9 +354,7 @@ export const getAllResponders = async (req: Request, res: Response) => {
       ];
     }
 
-    if (hospitalId) {
-      query.hospitalId = hospitalId;
-    }
+    if (hospitalId) query.hospitalId = hospitalId;
 
     const responders = await User.find(query)
       .select('name email phone responderType hospitalId certifications isActive')
@@ -383,6 +376,7 @@ export const getAllResponders = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, error: error.message || 'Failed to fetch responders' });
   }
 };
+
 /* ============================================================
    UPDATE USER STATUS (Admin only)
 ============================================================ */
@@ -401,16 +395,14 @@ export const updateUserStatus = async (req: Request, res: Response) => {
       { new: true, runValidators: true }
     ).select('-refreshToken -password');
 
-    if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
     logger.info(`User ${user.email} status updated to ${isActive ? 'active' : 'inactive'} by admin`);
 
     return res.json({
       success: true,
       message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
-      data: user
+      data: user,
     });
   } catch (error: any) {
     logger.error('Update user status error', error);
@@ -425,37 +417,24 @@ export const deleteUser = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
-    // Check if user exists
     const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-    // Prevent admin from deleting themselves
-    if (userId === (req as any).user?._id) {
+    if (userId === (req as any).user?._id?.toString()) {
       return res.status(400).json({ success: false, error: 'Cannot delete your own account' });
     }
 
-    // Optional: Check for related data before deletion
     if (user.role === 'driver') {
       const hasIncidents = await Incident.exists({ driverId: userId });
       if (hasIncidents) {
-        // Option 1: Prevent deletion
-        // return res.status(400).json({ success: false, error: 'Cannot delete driver with incident history' });
-        
-        // Option 2: Allow deletion (cascade or keep records)
         logger.info(`Deleting driver ${user.email} who has incident history`);
       }
     }
 
-    // Delete the user
     await User.findByIdAndDelete(userId);
 
-    // Also clean up related data
     if (user.role === 'driver') {
-      // Optionally delete or update related records
       await Location.deleteMany({ driverId: userId });
-      // Don't delete incidents, just mark them as anonymous or keep for records
       await Incident.updateMany(
         { driverId: userId },
         { $set: { driverId: null, driverName: 'Deleted User' } }
@@ -464,10 +443,7 @@ export const deleteUser = async (req: Request, res: Response) => {
 
     logger.info(`User ${user.email} deleted by admin`);
 
-    return res.json({
-      success: true,
-      message: 'User deleted successfully'
-    });
+    return res.json({ success: true, message: 'User deleted successfully' });
   } catch (error: any) {
     logger.error('Delete user error', error);
     return res.status(500).json({ success: false, error: error.message || 'Failed to delete user' });

@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
-import { useSocket } from '../../../hooks/useSocket';
 import { emergencyService } from '../../../services/api/emergency.service';
 import { hospitalService } from '../../../services/api/hospital.service';
+import { useIncidents } from '../../../hooks/useIncidents';
+import { useEmergencyAlerts } from '../../../hooks/useEmergencyAlerts';
+import { useSocket } from '../../../hooks/useSocket';
 import IncidentCard from '../Cards/IncidentCard';
 import StatsCard from '../Cards/StatsCard';
 import IncidentMap from '../Maps/IncidentMap';
+import AlertBanner from '../AlertBanner';
 import BedTracker from './BedTracker';
 import ShiftManager from './ShiftManager';
 import ETACountdown from './ETACountdown';
@@ -21,13 +24,25 @@ import { Incident } from '../../../types/emergency.types';
 import { toast } from 'react-hot-toast';
 
 const HospitalDashboard: React.FC = () => {
-  const { user } = useAuth();
-  const { socket, connected, on, off } = useSocket();
-  const navigate = useNavigate();
+  const { user }            = useAuth();
+  const { connected }       = useSocket();
+  const navigate            = useNavigate();
 
-  const [incidents, setIncidents]               = useState<Incident[]>([]);
+  // ── Use Phase 2 hooks for live incidents + alerts ──────────────────────────
+  const {
+    incidents,
+    loading,
+    refetch: refetchIncidents,
+  } = useIncidents();
+
+  const {
+    activeAlerts,
+    acknowledgeAlert,
+    acknowledgeAll,
+    unacknowledgedCount,
+  } = useEmergencyAlerts();
+
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
-  const [loading, setLoading]                   = useState(true);
   const [stats, setStats] = useState({
     totalIncidents:      0,
     activeIncidents:     0,
@@ -38,86 +53,61 @@ const HospitalDashboard: React.FC = () => {
     avgResponseTime:     0,
   });
 
+  // ── Derive stats from live incident list ───────────────────────────────────
   useEffect(() => {
-    fetchIncidents();
-    fetchHospitalStats();
-
-    if (socket && connected) {
-      on('new-incident',     handleNewIncident);
-      on('incident-update',  handleIncidentUpdate);
-    }
-
-    return () => {
-      off('new-incident',    handleNewIncident);
-      off('incident-update', handleIncidentUpdate);
-    };
-  }, [socket, connected]);
-
-  const fetchIncidents = async () => {
-    try {
-      const list = await emergencyService.getActiveIncidents({});
-      setIncidents(list);
-      setStats(prev => ({
-        ...prev,
-        totalIncidents:   list.length,
-        activeIncidents:  list.filter((i: Incident) => ['assigned','responding','dispatched'].includes(i.status)).length,
-        pendingIncidents: list.filter((i: Incident) => ['pending','reported'].includes(i.status)).length,
-      }));
-    } catch {
-      toast.error('Failed to load incidents');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchHospitalStats = async () => {
-    try {
-      const data = await hospitalService.getHospitalStats();
-      setStats(prev => ({
-        ...prev,
-        availableAmbulances: data.availableAmbulances ?? 0,
-        totalAmbulances:     data.totalAmbulances ?? 0,
-        activeResponders:    data.availableResponders ?? 0,
-        avgResponseTime:     Math.round(data.averageResponseTime ?? 0),
-      }));
-    } catch (error) {
-      console.error('Failed to fetch hospital stats:', error);
-    }
-  };
-
-  const handleNewIncident = (incident: Incident) => {
-    setIncidents(prev => [incident, ...prev]);
     setStats(prev => ({
       ...prev,
-      totalIncidents:   prev.totalIncidents + 1,
-      pendingIncidents: prev.pendingIncidents + 1,
+      totalIncidents:   incidents.length,
+      activeIncidents:  incidents.filter(i =>
+        ['assigned', 'responding', 'dispatched'].includes(i.status)
+      ).length,
+      pendingIncidents: incidents.filter(i =>
+        ['pending', 'reported'].includes(i.status)
+      ).length,
     }));
-    toast.error(
-      `🚨 New accident reported at ${incident.timestamp && new Date(incident.timestamp).toLocaleTimeString()}`,
-      { duration: 0, icon: '🚨' }
-    );
-    const audio = new Audio('/sounds/notification.mp3');
-    audio.play().catch(e => console.log('Audio play failed:', e));
-  };
+  }, [incidents]);
 
-  const handleIncidentUpdate = (updatedIncident: Incident) => {
-    setIncidents(prev =>
-      prev.map(inc => inc._id === updatedIncident._id ? updatedIncident : inc)
-    );
-  };
+  // ── Fetch hospital-specific stats (beds, ambulances) ──────────────────────
+  useEffect(() => {
+    const fetchHospitalStats = async () => {
+      try {
+        const data = await hospitalService.getHospitalStats();
+        setStats(prev => ({
+          ...prev,
+          availableAmbulances: data.availableAmbulances    ?? 0,
+          totalAmbulances:     data.totalAmbulances        ?? 0,
+          activeResponders:    data.availableResponders    ?? 0,
+          avgResponseTime:     Math.round(data.averageResponseTime ?? 0),
+        }));
+      } catch (error) {
+        console.error('Failed to fetch hospital stats:', error);
+      }
+    };
+    fetchHospitalStats();
+  }, []);
+
+  // ── Toast on new unacknowledged emergency alerts ───────────────────────────
+  useEffect(() => {
+    if (unacknowledgedCount > 0) {
+      const latest = activeAlerts[0];
+      if (latest?.type === 'panic' || latest?.type === 'emergency') {
+        toast.error(`🚨 ${latest.title}`, { duration: 0, icon: '🚨' });
+        const audio = new Audio('/sounds/notification.mp3');
+        audio.play().catch(() => {});
+      }
+    }
+  }, [unacknowledgedCount]);
 
   const handleAcceptIncident = async (incidentId: string) => {
     try {
       await emergencyService.acceptIncident(incidentId, user?._id || '', 'responder1', 10);
       toast.success('Incident accepted. Dispatching ambulance...');
-      fetchIncidents();
-      fetchHospitalStats();
+      refetchIncidents();
     } catch {
       toast.error('Failed to accept incident');
     }
   };
 
-  // Active incidents = those with a responder dispatched
   const activeIncidents = incidents.filter(i =>
     ['assigned', 'responding', 'dispatched'].includes(i.status)
   );
@@ -133,6 +123,13 @@ const HospitalDashboard: React.FC = () => {
   return (
     <div className="space-y-6">
 
+      {/* ── Emergency alert banners (Phase 2) ── */}
+      <AlertBanner
+        alerts={activeAlerts}
+        onAcknowledge={acknowledgeAlert}
+        onAcknowledgeAll={acknowledgeAll}
+      />
+
       {/* ── Header ── */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex items-center justify-between">
@@ -141,6 +138,16 @@ const HospitalDashboard: React.FC = () => {
             <p className="text-gray-600 mt-1">{(user as any)?.hospitalName || 'City General Hospital'}</p>
           </div>
           <div className="flex items-center space-x-4">
+            {/* Unacknowledged alert badge */}
+            {unacknowledgedCount > 0 && (
+              <button
+                onClick={acknowledgeAll}
+                className="relative flex items-center gap-1 bg-red-100 text-red-700 text-sm px-3 py-1.5 rounded-full font-medium hover:bg-red-200 transition"
+              >
+                <BellIcon className="h-4 w-4" />
+                {unacknowledgedCount} alert{unacknowledgedCount > 1 ? 's' : ''}
+              </button>
+            )}
             <div className="flex items-center space-x-2">
               <div className={`w-3 h-3 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
               <span className="text-sm text-gray-600">{connected ? 'Live' : 'Disconnected'}</span>
@@ -157,16 +164,16 @@ const HospitalDashboard: React.FC = () => {
 
       {/* ── Stats Grid ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatsCard title="Total Incidents"  value={stats.totalIncidents}      icon={BellIcon}         color="emergency" />
-        <StatsCard title="Active"           value={stats.activeIncidents}     icon={TruckIcon}        color="warning"   />
-        <StatsCard title="Pending"          value={stats.pendingIncidents}    icon={ClockIcon}        color="info"      />
-        <StatsCard title="Ambulances"       value={stats.availableAmbulances} icon={TruckIcon}        color="success"
+        <StatsCard title="Total Incidents"  value={stats.totalIncidents}      icon={BellIcon}      color="emergency" />
+        <StatsCard title="Active"           value={stats.activeIncidents}     icon={TruckIcon}     color="warning"   />
+        <StatsCard title="Pending"          value={stats.pendingIncidents}    icon={ClockIcon}     color="info"      />
+        <StatsCard title="Ambulances"       value={stats.availableAmbulances} icon={TruckIcon}     color="success"
           trend={{ value: stats.totalAmbulances, label: 'total', positive: true }} />
-        <StatsCard title="Responders"       value={stats.activeResponders}    icon={UserGroupIcon}    color="hospital"  />
-        <StatsCard title="Avg Response"     value={`${stats.avgResponseTime} min`} icon={ClockIcon}  color="warning"   />
+        <StatsCard title="Responders"       value={stats.activeResponders}    icon={UserGroupIcon} color="hospital"  />
+        <StatsCard title="Avg Response"     value={`${stats.avgResponseTime} min`} icon={ClockIcon} color="warning" />
       </div>
 
-      {/* ── ETA Countdowns (only when there are active incidents) ── */}
+      {/* ── ETA Countdowns ── */}
       {activeIncidents.length > 0 && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -202,13 +209,13 @@ const HospitalDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ── Bed Tracker + Shift Manager (side by side) ── */}
+      {/* ── Bed Tracker + Shift Manager ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <BedTracker hospitalId={(user as any)?._id} />
         <ShiftManager hospitalId={(user as any)?._id} />
       </div>
 
-      {/* ── Live Map ── */}
+      {/* ── Live Map (Phase 4) ── */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h2 className="text-lg font-semibold mb-4">Live Incidents Map</h2>
         <IncidentMap
@@ -218,10 +225,13 @@ const HospitalDashboard: React.FC = () => {
           showRadius={true}
           radius={10}
           showHotspots={true}
+          showDrivers={true}
+          showResponders={true}
+          showDriverTrails={false}
         />
       </div>
 
-      {/* ── Active Incidents ── */}
+      {/* ── Active Incidents list ── */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Active Incidents</h2>

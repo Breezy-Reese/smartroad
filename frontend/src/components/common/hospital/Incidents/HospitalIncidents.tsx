@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { FunnelIcon, MagnifyingGlassIcon, ArrowPathIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 import { emergencyService } from '../../../../services/api/emergency.service';
+import { useIncidents } from '../../../../hooks/useIncidents';
 import { Incident } from '../../../../types/emergency.types';
 import IncidentMap from '../../Maps/IncidentMap';
 import SeverityBadge from '../../SeverityBadge';
@@ -23,30 +24,19 @@ const SEVERITIES = ['low', 'medium', 'high', 'critical', 'fatal'];
 
 const HospitalIncidents: React.FC = () => {
   const navigate = useNavigate();
-  const [incidents, setIncidents]               = useState<Incident[]>([]);
+
+  // ── Live incident list from socket + REST (Phase 2) ───────────────────────
+  const { incidents, loading, refetch } = useIncidents();
+
   const [filtered, setFiltered]                 = useState<Incident[]>([]);
-  const [loading, setLoading]                   = useState(true);
   const [view, setView]                         = useState<'table' | 'map'>('table');
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [filters, setFilters] = useState({
     search: '', status: '', severity: '', startDate: '', endDate: '',
   });
 
-  useEffect(() => { fetchIncidents(); }, []);
-  useEffect(() => { applyFilters(); }, [incidents, filters]);
-
-  const fetchIncidents = async () => {
-    try {
-      const list = await emergencyService.getActiveIncidents({});
-      setIncidents(list);
-    } catch {
-      toast.error('Failed to load incidents');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyFilters = () => {
+  // ── Re-apply filters whenever incidents or filter values change ───────────
+  useEffect(() => {
     let result = [...incidents];
     if (filters.status)    result = result.filter(i => i.status === filters.status);
     if (filters.severity)  result = result.filter(i => i.severity === filters.severity);
@@ -56,18 +46,18 @@ const HospitalIncidents: React.FC = () => {
       const s = filters.search.toLowerCase();
       result = result.filter(i =>
         (i.incidentId ?? '').toLowerCase().includes(s) ||
-        (i.driver?.name ?? '').toLowerCase().includes(s) ||
+        (i.driverName ?? (i as any).driver?.name ?? '').toLowerCase().includes(s) ||
         (i.vehicleNumber ?? '').toLowerCase().includes(s)
       );
     }
     setFiltered(result);
-  };
+  }, [incidents, filters]);
 
   const handleAccept = async (incidentId: string) => {
     try {
       await emergencyService.acceptIncident(incidentId, 'hospital1', 'responder1', 10);
       toast.success('Incident accepted');
-      fetchIncidents();
+      refetch();
     } catch {
       toast.error('Failed to accept incident');
     }
@@ -83,7 +73,8 @@ const HospitalIncidents: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header + Filters */}
+
+      {/* ── Header + Filters ── */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -101,7 +92,7 @@ const HospitalIncidents: React.FC = () => {
               <span>{view === 'table' ? 'Map View' : 'Table View'}</span>
             </button>
             <button
-              onClick={fetchIncidents}
+              onClick={refetch}
               className="flex items-center space-x-2 px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm"
             >
               <ArrowPathIcon className="h-4 w-4" />
@@ -121,20 +112,42 @@ const HospitalIncidents: React.FC = () => {
               className="pl-9 w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-red-500"
             />
           </div>
-          <select value={filters.status}    onChange={e => setFilters(p => ({ ...p, status: e.target.value }))}    className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-red-500">
+          <select
+            value={filters.status}
+            onChange={e => setFilters(p => ({ ...p, status: e.target.value }))}
+            className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-red-500"
+          >
             <option value="">All Status</option>
-            {STATUSES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+            {STATUSES.map(s => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
           </select>
-          <select value={filters.severity}  onChange={e => setFilters(p => ({ ...p, severity: e.target.value }))}  className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-red-500">
+          <select
+            value={filters.severity}
+            onChange={e => setFilters(p => ({ ...p, severity: e.target.value }))}
+            className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-red-500"
+          >
             <option value="">All Severity</option>
-            {SEVERITIES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+            {SEVERITIES.map(s => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
           </select>
-          <input type="date" value={filters.startDate} onChange={e => setFilters(p => ({ ...p, startDate: e.target.value }))} className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-red-500" />
-          <input type="date" value={filters.endDate}   onChange={e => setFilters(p => ({ ...p, endDate: e.target.value }))}   className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-red-500" />
+          <input
+            type="date"
+            value={filters.startDate}
+            onChange={e => setFilters(p => ({ ...p, startDate: e.target.value }))}
+            className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-red-500"
+          />
+          <input
+            type="date"
+            value={filters.endDate}
+            onChange={e => setFilters(p => ({ ...p, endDate: e.target.value }))}
+            className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-red-500"
+          />
         </div>
       </div>
 
-      {/* Map View */}
+      {/* ── Map View (Phase 4) ── */}
       {view === 'map' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-lg font-semibold mb-4">Incidents Map</h2>
@@ -145,19 +158,22 @@ const HospitalIncidents: React.FC = () => {
             showRadius={false}
             showHotspots={true}
             hotspotThreshold={3}
-             hotspotRadiusKm={1} 
+            hotspotRadiusKm={1}
+            showDrivers={true}
+            showResponders={true}
+            showDriverTrails={true}
           />
         </div>
       )}
 
-      {/* Table View */}
+      {/* ── Table View ── */}
       {view === 'table' && (
         <div className="bg-white rounded-lg shadow-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {['Incident ID', 'Time', 'Location', 'Severity Score', 'Status', 'Driver', 'Responders', 'Actions'].map(h => (
+                  {['Incident ID', 'Time', 'Location', 'Severity', 'Status', 'Driver', 'Responders', 'Actions'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
                   ))}
                 </tr>
@@ -172,9 +188,12 @@ const HospitalIncidents: React.FC = () => {
                       {format(new Date(incident.timestamp ?? new Date()), 'HH:mm, MMM dd')}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {incident.locationAddress ||
-                        `${(incident.location?.latitude ?? incident.location?.lat)?.toFixed(4) ?? 'N/A'}, 
-                         ${(incident.location?.longitude ?? incident.location?.lng)?.toFixed(4) ?? 'N/A'}`}
+                      {incident.locationAddress ?? (
+                        // IGeoLocation uses GeoJSON coordinates [lng, lat]
+                        incident.location?.coordinates
+                          ? `${incident.location.coordinates[1].toFixed(4)}, ${incident.location.coordinates[0].toFixed(4)}`
+                          : 'N/A'
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <SeverityBadge
@@ -190,16 +209,26 @@ const HospitalIncidents: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {incident.driver?.name ?? (incident as any).driverName ?? 'Unknown'}
+                      {incident.driverName ?? (incident as any).driver?.name ?? 'Unknown'}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {incident.responders?.length || 0}
+                      {incident.responders?.length ?? 0}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <div className="flex space-x-2">
-                        <button onClick={() => navigate(`/alert/${incident._id}`)} className="text-blue-600 hover:text-blue-800 font-medium">View</button>
+                        <button
+                          onClick={() => navigate(`/alert/${incident._id}`)}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          View
+                        </button>
                         {incident.status === 'pending' && (
-                          <button onClick={() => handleAccept(incident._id)} className="text-green-600 hover:text-green-800 font-medium">Accept</button>
+                          <button
+                            onClick={() => handleAccept(incident._id)}
+                            className="text-green-600 hover:text-green-800 font-medium"
+                          >
+                            Accept
+                          </button>
                         )}
                       </div>
                     </td>

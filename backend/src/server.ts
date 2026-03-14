@@ -5,6 +5,7 @@ import { redisClient } from './config/redis.config';
 import { Server } from 'socket.io';
 import http from 'http';
 import dotenv from 'dotenv';
+dotenv.config();
 import mongoose from 'mongoose';
 
 process.on('exit', (code) => {
