@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useAdminStats } from '../../../hooks/useAdminStats';
-import { useExports } from '../../../hooks/useExports';
-import { FleetIncident, IncidentSeverity } from '../../../types/admin.types';
+import { useAdminStats } from '../../hooks/useAdminStats';
+import { useExports } from '../../hooks/useExports';
+import { FleetIncident, IncidentSeverity } from '../../types/admin.types';
 import {
   TruckIcon,
   ExclamationTriangleIcon,

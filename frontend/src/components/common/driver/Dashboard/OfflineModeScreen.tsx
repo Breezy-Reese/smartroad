@@ -1,5 +1,5 @@
 import React from 'react';
-import { useOfflineSync, SyncStatus } from '../../../hooks/useOfflineSync';
+import { useOfflineSync, SyncStatus } from '../../../../hooks/useOfflineSync';
 import {
   WifiIcon,
   ArrowPathIcon,

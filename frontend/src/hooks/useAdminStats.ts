@@ -1,77 +1,186 @@
-import { useState, useEffect, useCallback } from 'react';
-import { AdminStats, FleetIncident, IncidentSeverity } from '../types/admin.types';
+import { useState, useEffect } from "react";
+import { FleetIncident, IncidentSeverity } from "../types/admin.types";
 
-/* ── Seed realistic mock data ── */
-const DRIVER_NAMES = [
-  'James Mwangi', 'Aisha Kamau', 'Peter Odhiambo', 'Grace Wanjiku',
-  'Samuel Otieno', 'Faith Njeri', 'David Kimani', 'Mary Achieng',
+export interface AdminStats {
+  totalUsers: number;
+  activeDrivers: number;
+  totalTrips: number;
+  completedTrips: number;
+  pendingTrips: number;
+  cancelledTrips: number;
+  totalExports: number;
+  lastExportDate: string | null;
+  openIncidents: number;
+  incidentsWeek: number;
+}
+
+interface UseAdminStatsReturn {
+  stats: AdminStats;
+  incidents: FleetIncident[];
+  loading: boolean;
+  error: string | null;
+  refresh: () => void;
+  refetch: () => void;
+}
+
+const DEFAULT_STATS: AdminStats = {
+  totalUsers: 0,
+  activeDrivers: 0,
+  totalTrips: 0,
+  completedTrips: 0,
+  pendingTrips: 0,
+  cancelledTrips: 0,
+  totalExports: 0,
+  lastExportDate: null,
+  openIncidents: 0,
+  incidentsWeek: 0,
+};
+
+const now = Date.now();
+const day = 86400000;
+
+const PLACEHOLDER_INCIDENTS: FleetIncident[] = [
+  {
+    id: "inc-001",
+    driverId: "drv-01",
+    driverName: "James Mwangi",
+    type: "Harsh Braking",
+    severity: "medium" as IncidentSeverity,
+    lat: -1.2921,
+    lng: 36.8219,
+    timestamp: now - day * 0.5,
+    resolved: false,
+    notificationsSent: 2,
+    escalationLevel: 1,
+  },
+  {
+    id: "inc-002",
+    driverId: "drv-02",
+    driverName: "Aisha Odhiambo",
+    type: "Speeding",
+    severity: "high" as IncidentSeverity,
+    lat: -1.3001,
+    lng: 36.8100,
+    timestamp: now - day * 1,
+    resolved: false,
+    notificationsSent: 3,
+    escalationLevel: 2,
+  },
+  {
+    id: "inc-003",
+    driverId: "drv-03",
+    driverName: "Peter Kamau",
+    type: "Accident",
+    severity: "critical" as IncidentSeverity,
+    lat: -1.2750,
+    lng: 36.8350,
+    timestamp: now - day * 2,
+    resolved: true,
+    resolvedAt: now - day * 1.5,
+    notificationsSent: 5,
+    escalationLevel: 3,
+    tripScore: 42,
+  },
+  {
+    id: "inc-004",
+    driverId: "drv-04",
+    driverName: "Grace Wanjiru",
+    type: "Idling",
+    severity: "low" as IncidentSeverity,
+    lat: -1.2850,
+    lng: 36.8200,
+    timestamp: now - day * 3,
+    resolved: true,
+    resolvedAt: now - day * 2.8,
+    notificationsSent: 1,
+    escalationLevel: 1,
+    tripScore: 78,
+  },
+  {
+    id: "inc-005",
+    driverId: "drv-05",
+    driverName: "Brian Otieno",
+    type: "Sharp Cornering",
+    severity: "medium" as IncidentSeverity,
+    lat: -1.2650,
+    lng: 36.8400,
+    timestamp: now - day * 4,
+    resolved: false,
+    notificationsSent: 2,
+    escalationLevel: 1,
+  },
+  {
+    id: "inc-006",
+    driverId: "drv-06",
+    driverName: "Mercy Njeri",
+    type: "Speeding",
+    severity: "high" as IncidentSeverity,
+    lat: -1.3100,
+    lng: 36.8050,
+    timestamp: now - day * 5,
+    resolved: false,
+    notificationsSent: 4,
+    escalationLevel: 2,
+  },
 ];
 
-const INCIDENT_TYPES = [
-  'Harsh braking', 'Speeding', 'Sharp turn', 'Emergency SOS',
-  'Geofence breach', 'Phone use', 'Fatigue alert',
-];
-
-const SEVERITIES: IncidentSeverity[] = ['low', 'medium', 'high', 'critical'];
-
-const randomBetween = (min: number, max: number) =>
-  Math.floor(Math.random() * (max - min + 1)) + min;
-
-/* Nairobi-area bounding box */
-const randomLat = () => -1.28 + (Math.random() - 0.5) * 0.18;
-const randomLng = () => 36.82 + (Math.random() - 0.5) * 0.22;
-
-export const generateMockIncidents = (count = 60): FleetIncident[] =>
-  Array.from({ length: count }, (_, i) => ({
-    id: `inc_${i + 1}`,
-    driverId: `drv_${(i % DRIVER_NAMES.length) + 1}`,
-    driverName: DRIVER_NAMES[i % DRIVER_NAMES.length],
-    type: INCIDENT_TYPES[i % INCIDENT_TYPES.length],
-    severity: SEVERITIES[Math.floor(Math.random() * SEVERITIES.length)],
-    lat: randomLat(),
-    lng: randomLng(),
-    timestamp: Date.now() - randomBetween(0, 7 * 24 * 60 * 60 * 1000),
-    resolved: Math.random() > 0.3,
-    resolvedAt: Math.random() > 0.3 ? Date.now() - randomBetween(0, 3600 * 1000) : undefined,
-    notificationsSent: randomBetween(1, 6),
-    escalationLevel: [1, 2, 3][Math.floor(Math.random() * 3)] as 1 | 2 | 3,
-    tripScore: randomBetween(42, 100),
-  }));
-
-export const useAdminStats = () => {
-  const [stats, setStats] = useState<AdminStats | null>(null);
+export const useAdminStats = (): UseAdminStatsReturn => {
+  const [stats, setStats] = useState<AdminStats>(DEFAULT_STATS);
   const [incidents, setIncidents] = useState<FleetIncident[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
-  const fetchStats = useCallback(async () => {
-    setLoading(true);
-    try {
-      // TODO: GET /admin/stats
-      await new Promise((r) => setTimeout(r, 600));
-      const mock = generateMockIncidents(60);
-      const now = Date.now();
-      const dayAgo = now - 86400000;
-      const weekAgo = now - 7 * 86400000;
+  useEffect(() => {
+    let cancelled = false;
 
-      setIncidents(mock);
-      setStats({
-        totalDrivers: DRIVER_NAMES.length,
-        activeDrivers: randomBetween(3, DRIVER_NAMES.length),
-        incidentsToday: mock.filter((i) => i.timestamp > dayAgo).length,
-        incidentsWeek: mock.filter((i) => i.timestamp > weekAgo).length,
-        avgTripScore: Math.round(mock.reduce((s, i) => s + (i.tripScore ?? 0), 0) / mock.length),
-        openIncidents: mock.filter((i) => !i.resolved).length,
-        notificationsSentToday: mock
-          .filter((i) => i.timestamp > dayAgo)
-          .reduce((s, i) => s + i.notificationsSent, 0),
-        deliveryRate: 0.91,
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    const fetchStats = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // TODO: replace with your real API endpoints
+        // const [statsRes, incidentsRes] = await Promise.all([
+        //   fetch("/api/admin/stats"),
+        //   fetch("/api/admin/incidents"),
+        // ]);
 
-  useEffect(() => { fetchStats(); }, [fetchStats]);
+        const openIncidents = PLACEHOLDER_INCIDENTS.filter((i) => !i.resolved).length;
+        const weekAgo = now - day * 7;
+        const incidentsWeek = PLACEHOLDER_INCIDENTS.filter((i) => i.timestamp >= weekAgo).length;
 
-  return { stats, incidents, loading, refresh: fetchStats };
+        const data: AdminStats = {
+          totalUsers: 128,
+          activeDrivers: 34,
+          totalTrips: 512,
+          completedTrips: 480,
+          pendingTrips: 18,
+          cancelledTrips: 14,
+          totalExports: 27,
+          lastExportDate: new Date().toISOString(),
+          openIncidents,
+          incidentsWeek,
+        };
+
+        if (!cancelled) {
+          setStats(data);
+          setIncidents(PLACEHOLDER_INCIDENTS);
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Unknown error");
+          setStats(DEFAULT_STATS);
+          setIncidents([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchStats();
+    return () => { cancelled = true; };
+  }, [tick]);
+
+  const refresh = () => setTick((t) => t + 1);
+
+  return { stats, incidents, loading, error, refresh, refetch: refresh };
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTripScoring, TripScore } from '../../../hooks/useTripScoring';
+import { useTripScoring, TripScore } from '../../../../hooks/useTripScoring';
 import {
   TruckIcon,
   ExclamationCircleIcon,

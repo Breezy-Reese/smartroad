@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useAdminStats } from '../../../hooks/useAdminStats';
-import { FleetIncident, IncidentSeverity } from '../../../types/admin.types';
+import { useAdminStats } from '../../hooks/useAdminStats';
+import { FleetIncident, IncidentSeverity } from '../../types/admin.types';
 import { ArrowPathIcon, MapPinIcon } from '@heroicons/react/24/outline';
 
 /*

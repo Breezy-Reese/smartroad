@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import * as userController from '../controllers/user.controller';
-import { authenticate, authorize, requireAdmin } from '../middleware/auth.middleware'; // Removed checkOwnership if not used
+import * as driverController from '../controllers/driver.controller';
+import { authenticate, authorize, requireAdmin, requireDriver } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validation.middleware';
 
 const router = Router();
 
-// Validation rules
+// ==================== VALIDATION RULES ====================
+
 const updateProfileValidation = [
   body('name')
     .optional()
@@ -78,6 +80,14 @@ const medicalInfoValidation = [
     .optional()
     .isBoolean().withMessage('organDonor must be a boolean')
     .toBoolean(),
+  body('doctorName')
+    .optional()
+    .isString().withMessage('Doctor name must be a string')
+    .trim(),
+  body('doctorPhone')
+    .optional()
+    .matches(/^\+?[\d\s-]{7,}$/).withMessage('Invalid doctor phone number')
+    .trim(),
 ];
 
 const changePasswordValidation = [
@@ -119,91 +129,116 @@ const paginationValidation = [
     .isMongoId().withMessage('Invalid hospital ID format'),
 ];
 
-// ==================== PUBLIC ROUTES ====================
-// None yet
-
 // ==================== PROTECTED ROUTES ====================
 
-// Profile routes
-router.get('/profile/:userId?', 
+// Profile
+router.get('/profile/:userId?',
   authenticate,
   validate(userIdParamValidation),
-  userController.getUserProfile
+  userController.getUserProfile,
 );
 
 router.put('/profile',
   authenticate,
   validate(updateProfileValidation),
-  userController.updateUserProfile
+  userController.updateUserProfile,
 );
 
-// Password change
+// Password
 router.put('/change-password',
   authenticate,
   validate(changePasswordValidation),
-  userController.changePassword
+  userController.changePassword,
 );
 
 // Emergency contacts
 router.get('/emergency-contacts',
   authenticate,
-  userController.getEmergencyContacts
+  userController.getEmergencyContacts,
 );
 
 router.post('/emergency-contacts',
   authenticate,
   validate(emergencyContactValidation),
-  userController.addEmergencyContact
+  userController.addEmergencyContact,
 );
 
 router.put('/emergency-contacts/:contactId',
   authenticate,
   validate([...contactIdParamValidation, ...emergencyContactValidation]),
-  userController.updateEmergencyContact
+  userController.updateEmergencyContact,
 );
 
 router.delete('/emergency-contacts/:contactId',
   authenticate,
   validate(contactIdParamValidation),
-  userController.deleteEmergencyContact
+  userController.deleteEmergencyContact,
 );
 
-// Medical information
+// Medical info
 router.put('/medical-info',
   authenticate,
   validate(medicalInfoValidation),
-  userController.updateMedicalInfo
+  userController.updateMedicalInfo,
+);
+
+// ==================== DRIVER ROUTES ====================
+
+// Trip scores
+router.post('/trip-scores',
+  authenticate,
+  requireDriver,
+  driverController.submitTripScore,
+);
+
+router.get('/trip-scores/average',
+  authenticate,
+  requireDriver,
+  driverController.getAverageTripScore,
+);
+
+router.get('/trip-scores',
+  authenticate,
+  requireDriver,
+  driverController.getTripScores,
+);
+
+// Preferences
+router.get('/preferences',
+  authenticate,
+  driverController.getPreferences,
+);
+
+router.put('/preferences',
+  authenticate,
+  driverController.savePreferences,
 );
 
 // ==================== ADMIN/HOSPITAL ROUTES ====================
 
-// Get all drivers (admin/hospital)
 router.get('/drivers',
   authenticate,
   authorize('admin', 'hospital'),
   validate(paginationValidation),
-  userController.getAllDrivers
+  userController.getAllDrivers,
 );
 
-// Get all hospitals (admin only)
 router.get('/hospitals',
   authenticate,
   authorize('admin'),
   validate(paginationValidation),
-  userController.getAllHospitals
+  userController.getAllHospitals,
 );
 
-// Get all responders (admin/hospital)
 router.get('/responders',
   authenticate,
   authorize('admin', 'hospital'),
   validate(paginationValidation),
-  userController.getAllResponders
+  userController.getAllResponders,
 );
 
 // ==================== ADMIN ONLY ROUTES ====================
 
-// Update user status (activate/deactivate)
 router.put('/:userId/status',
   authenticate,
   requireAdmin,
@@ -211,15 +246,14 @@ router.put('/:userId/status',
     ...userIdParamValidation,
     body('isActive').isBoolean().withMessage('isActive must be a boolean'),
   ]),
-  userController.updateUserStatus
+  userController.updateUserStatus,
 );
 
-// Delete user
 router.delete('/:userId',
   authenticate,
   requireAdmin,
   validate(userIdParamValidation),
-  userController.deleteUser
+  userController.deleteUser,
 );
 
 export default router;

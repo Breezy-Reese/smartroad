@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useAuditLog } from '../../../hooks/useAuditLog';
-import { useExports } from '../../../hooks/useExports';
-import { AuditEntry, AdminRole } from '../../../types/admin.types';
+import { useAuditLog } from '../../hooks/useAuditLog';
+import { useExports } from '../../hooks/useExports';
+import { AuditEntry, AdminRole } from '../../types/admin.types';
 import {
   ShieldCheckIcon,
   MagnifyingGlassIcon,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMedicalProfile, MedicalProfile } from '../../../hooks/useMedicalProfile';
+import { useMedicalProfile, MedicalProfile } from '../../../../hooks/useMedicalProfile';
 import {
   HeartIcon,
   PlusIcon,
@@ -108,8 +108,8 @@ const MedicalProfileScreen: React.FC = () => {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Blood type</label>
           <select
-            value={form.bloodType}
-            onChange={(e) => set('bloodType', e.target.value)}
+            value={form.bloodGroup}
+            onChange={(e) => set('bloodGroup', e.target.value)}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Select blood type</option>
@@ -125,9 +125,9 @@ const MedicalProfileScreen: React.FC = () => {
         />
         <TagListEditor
           label="Medical conditions"
-          items={form.conditions}
+          items={form.medicalConditions}
           placeholder="e.g. Diabetes"
-          onChange={(v) => set('conditions', v)}
+          onChange={(v) => set('medicalConditions', v)}
         />
         <TagListEditor
           label="Current medications"
@@ -140,8 +140,8 @@ const MedicalProfileScreen: React.FC = () => {
           <label className="block text-sm font-medium text-gray-700 mb-1">Additional notes</label>
           <textarea
             rows={3}
-            value={form.notes}
-            onChange={(e) => set('notes', e.target.value)}
+            value={form.emergencyNotes}
+            onChange={(e) => set('emergencyNotes', e.target.value)}
             placeholder="Any other information paramedics should know…"
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />

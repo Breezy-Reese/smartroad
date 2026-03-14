@@ -104,17 +104,18 @@ export interface EmergencyContact {
 
 /* ================= MEDICAL INFO ================= */
 
+
 export interface MedicalInfo {
   bloodGroup: string;
-
   allergies: string[];
   medicalConditions: string[];
   medications: string[];
-
   emergencyNotes?: string;
-
   organDonor: boolean;
+  doctorName?: string;    // ADD
+  doctorPhone?: string;   // ADD
 }
+
 
 /* ================= AUTH ================= */
 

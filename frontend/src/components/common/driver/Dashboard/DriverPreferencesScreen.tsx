@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useDriverPreferences, DriverPreferences } from '../../../hooks/useDriverPreferences';
+import { useDriverPreferences, DriverPreferences } from '../../../../hooks/useDriverPreferences';
 import {
   BellIcon,
   GlobeAltIcon,

@@ -1,64 +1,75 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
+import { driverService } from '../services/api/driver.service';
 
-export interface MedicalProfile {
-  bloodType: string;
-  allergies: string[];
-  conditions: string[];
-  medications: string[];
-  emergencyContact: {
-    name: string;
-    phone: string;
-    relationship: string;
-  };
-  doctorName: string;
-  doctorPhone: string;
-  notes: string;
+/* Extends the existing MedicalInfo type with doctor fields */
+export interface EmergencyContact {
+  name: string;
+  relationship: string;
+  phone: string;
 }
 
-const DEFAULT_PROFILE: MedicalProfile = {
-  bloodType: '',
+export interface MedicalProfile {
+  bloodGroup: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | '';
+  allergies: string[];
+  medicalConditions: string[];
+  medications: string[];
+  emergencyNotes: string;
+  emergencyContact: EmergencyContact;
+  organDonor: boolean;
+  doctorName: string;
+  doctorPhone: string;
+}
+
+const DEFAULT: MedicalProfile = {
+  bloodGroup: '',
   allergies: [],
-  conditions: [],
+  medicalConditions: [],
   medications: [],
-  emergencyContact: { name: '', phone: '', relationship: '' },
+  emergencyNotes: '',
+  emergencyContact: { name: '', relationship: '', phone: '' },
+  organDonor: false,
   doctorName: '',
   doctorPhone: '',
-  notes: '',
 };
 
 export const useMedicalProfile = () => {
-  const [profile, setProfile] = useState<MedicalProfile>(() => {
-    try {
-      const stored = localStorage.getItem('medical_profile');
-      return stored ? JSON.parse(stored) : DEFAULT_PROFILE;
-    } catch {
-      return DEFAULT_PROFILE;
-    }
-  });
-  const [loading, setLoading] = useState(false);
+  const [profile, setProfile] = useState<MedicalProfile>(DEFAULT);
+  const [loading, setLoading]  = useState(false);
+  const [fetched, setFetched]  = useState(false);
 
-  const saveProfile = useCallback(async (data: MedicalProfile) => {
+  const fetchProfile = useCallback(async () => {
+    if (fetched) return;
     setLoading(true);
     try {
-      // TODO: replace with API call e.g. await api.put('/driver/medical-profile', data)
-      await new Promise((r) => setTimeout(r, 600));
-      localStorage.setItem('medical_profile', JSON.stringify(data));
-      setProfile(data);
+      const data = await driverService.getMedicalProfile();
+      setProfile({ ...DEFAULT, ...data });
+      setFetched(true);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error ?? 'Failed to load medical profile');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetched]);
+
+  const saveProfile = useCallback(async (updated: MedicalProfile) => {
+    setLoading(true);
+    try {
+      const data = await driverService.saveMedicalProfile(updated);
+      setProfile({ ...DEFAULT, ...data });
       toast.success('Medical profile saved');
-    } catch {
-      toast.error('Failed to save medical profile');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error ?? 'Failed to save medical profile');
     } finally {
       setLoading(false);
     }
   }, []);
 
   const updateField = useCallback(<K extends keyof MedicalProfile>(
-    field: K,
-    value: MedicalProfile[K],
+    key: K, value: MedicalProfile[K],
   ) => {
-    setProfile((prev) => ({ ...prev, [field]: value }));
+    setProfile((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  return { profile, loading, saveProfile, updateField };
+  return { profile, loading, fetchProfile, saveProfile, updateField };
 };

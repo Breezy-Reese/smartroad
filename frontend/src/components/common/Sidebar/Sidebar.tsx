@@ -31,6 +31,24 @@ const navItems: NavItem[] = [
     roles: ['admin'],
   },
   {
+    name: 'Fleet',
+    to: '/admin/fleet',
+    icon: TruckIcon,
+    roles: ['admin'],
+  },
+  {
+    name: 'Audit Log',
+    to: '/admin/audit',
+    icon: DocumentChartBarIcon,
+    roles: ['admin'],
+  },
+  {
+    name: 'Exports',
+    to: '/admin/exports',
+    icon: ChartBarIcon,
+    roles: ['admin'],
+  },
+  {
     name: 'User Management',
     to: '/admin/users',
     icon: UsersIcon,
@@ -49,7 +67,7 @@ const navItems: NavItem[] = [
     roles: ['admin'],
   },
 
-  // Hospital routes
+    // Hospital routes
   {
     name: 'Dashboard',
     to: '/hospital',
@@ -81,12 +99,29 @@ const navItems: NavItem[] = [
     roles: ['hospital'],
   },
   {
+    name: 'Bed Tracker',
+    to: '/hospital/beds',
+    icon: UserGroupIcon,
+    roles: ['hospital'],
+  },
+  {
+    name: 'ETA Countdown',
+    to: '/hospital/eta',
+    icon: ClockIcon,
+    roles: ['hospital'],
+  },
+  {
+    name: 'Shift Manager',
+    to: '/hospital/shifts',
+    icon: WrenchScrewdriverIcon,
+    roles: ['hospital'],
+  },
+  {
     name: 'Settings',
     to: '/hospital/settings',
     icon: Cog6ToothIcon,
     roles: ['hospital'],
   },
-
   // Driver routes
   {
     name: 'Dashboard',
@@ -107,13 +142,60 @@ const navItems: NavItem[] = [
     roles: ['driver'],
   },
   {
+    name: 'Medical Profile',
+    to: '/driver/medical',
+    icon: UserGroupIcon,
+    roles: ['driver'],
+  },
+  {
+    name: 'Trip Scoring',
+    to: '/driver/scoring',
+    icon: ChartBarIcon,
+    roles: ['driver'],
+  },
+  {
+    name: 'Offline Mode',
+    to: '/driver/offline',
+    icon: WrenchScrewdriverIcon,
+    roles: ['driver'],
+  },
+  {
+    name: 'Preferences',
+    to: '/driver/preferences',
+    icon: Cog6ToothIcon,
+    roles: ['driver'],
+  },
+  {
+    name: 'Next of Kin',
+    to: '/driver/next-of-kin',
+    icon: UsersIcon,
+    roles: ['driver'],
+  },
+  {
+    name: 'Escalation Policy',
+    to: '/driver/escalation',
+    icon: PhoneIcon,
+    roles: ['driver'],
+  },
+  {
+    name: 'Notifications',
+    to: '/driver/notification-settings',
+    icon: DocumentChartBarIcon,
+    roles: ['driver'],
+  },
+  {
+    name: 'Delivery Receipts',
+    to: '/driver/delivery-receipts',
+    icon: TruckIcon,
+    roles: ['driver'],
+  },
+  {
     name: 'Profile',
     to: '/driver/profile',
     icon: Cog6ToothIcon,
     roles: ['driver'],
   },
 ];
-
 const Sidebar: React.FC = () => {
   const { user } = useAuth();
   const filteredItems = navItems.filter(
@@ -124,30 +206,22 @@ const Sidebar: React.FC = () => {
     <aside className="w-64 bg-white shadow-lg min-h-screen">
       <nav className="mt-5 px-2">
         {filteredItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === '/admin' || item.to === '/hospital' || item.to === '/driver'}
-            className={({ isActive }) =>
-              `group flex items-center px-2 py-2 text-sm font-medium rounded-md mb-1 ${
-                isActive
-                  ? 'bg-red-100 text-red-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <item.icon
-                  className={`mr-3 h-5 w-5 ${
-                    isActive ? 'text-red-500' : 'text-gray-400 group-hover:text-gray-500'
-                  }`}
-                />
-                {item.name}
-              </>
-            )}
-          </NavLink>
-        ))}
+  <NavLink
+    key={item.to}
+    to={item.to}
+    end={item.to === '/admin' || item.to === '/hospital' || item.to === '/driver'}
+    className={({ isActive }) =>
+      `group flex items-center px-2 py-2 text-sm font-medium rounded-md mb-1 ${
+        isActive
+          ? 'bg-red-100 text-red-700'
+          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+      }`
+    }
+  >
+  <item.icon className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
+  {item.name}
+</NavLink>
+))}
       </nav>
     </aside>
   );
