@@ -120,6 +120,7 @@ export interface MedicalInfo {
 /* ================= AUTH ================= */
 
 export interface AuthResponse {
+  data: { accessToken: any; refreshToken: any; };
   token: string;
   refreshToken: string;
   user: User;

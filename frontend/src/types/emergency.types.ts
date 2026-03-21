@@ -38,6 +38,7 @@ export type ResponderStatus =
 // ----------------------
 
 export interface Location {
+  coordinates: any;
   latitude: number;
   longitude: number;
   // compatibility aliases for map libraries
@@ -65,6 +66,7 @@ export interface EmergencyAlert {
 }
 
 export interface Incident {
+  driverName: any;
   _id: string;
   id?: string;
 
