@@ -60,13 +60,13 @@ const SystemHealth: React.FC = () => {
   );
 
   const metrics = [
-    { label: 'System Status', value: health?.status || 'Unknown', isStatus: true },
-    { label: 'Database', value: health?.dbStatus || 'Unknown', isStatus: true },
-    { label: 'Uptime', value: formatUptime(health?.uptime), isStatus: false },
-    { label: 'Active Connections', value: String(health?.activeConnections ?? 'N/A'), isStatus: false },
-    { label: 'CPU Usage', value: health?.cpuUsage !== undefined ? `${health.cpuUsage}%` : 'N/A', isStatus: false },
-    { label: 'Memory Used', value: health?.memoryUsage ? `${health.memoryUsage.used}MB / ${health.memoryUsage.total}MB` : 'N/A', isStatus: false },
-  ];
+    { label: 'System Status',      value: health?.status || 'Unknown',                                              isStatus: true  },
+    { label: 'Database',           value: health?.dbStatus || 'Unknown',                                            isStatus: true  },
+    { label: 'Uptime',             value: formatUptime(health?.uptime),                                             isStatus: false },
+    { label: 'Active Connections', value: String(health?.activeConnections ?? 'N/A'),                               isStatus: false },
+    { label: 'CPU Usage',          value: health?.cpuUsage !== undefined ? `${health.cpuUsage}%` : 'N/A',           isStatus: false },
+    { label: 'Memory Used',        value: health?.memoryUsage ? `${health.memoryUsage.used} MB / ${health.memoryUsage.total} MB` : 'N/A', isStatus: false },
+  ]; // ← this closing ]; was missing
 
   return (
     <div className="p-6 space-y-6">

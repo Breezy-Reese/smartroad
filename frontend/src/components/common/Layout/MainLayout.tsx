@@ -14,8 +14,16 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
+
       <div className="flex">
-        {user && <Sidebar />}
+        {/* Sidebar — sticks to the left as you scroll */}
+        {user && (
+          <aside className="sticky top-0 h-screen flex-shrink-0 overflow-y-auto">
+            <Sidebar />
+          </aside>
+        )}
+
+        {/* Main content — scrolls normally with the page */}
         <main className="flex-1 p-6">
           {children ? children : <Outlet />}
         </main>

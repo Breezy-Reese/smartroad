@@ -12,8 +12,6 @@ interface UseExportsReturn {
   refetch: () => void;
 }
 
-// ── Fallback: generate + download a CSV in the browser if the server
-//    can't produce one (e.g. the backend export endpoint isn't ready yet).
 const downloadCSV = (filename: string, rows: Record<string, unknown>[]) => {
   if (!rows.length) return;
   const headers = Object.keys(rows[0]);
@@ -32,7 +30,12 @@ const downloadCSV = (filename: string, rows: Record<string, unknown>[]) => {
   URL.revokeObjectURL(url);
 };
 
-// ── Poll a job until it reaches a terminal state (ready | failed).
+// ── Normalize MongoDB _id → id so the rest of the app uses job.id consistently
+const normalizeJob = (raw: Record<string, unknown>): ExportJob => ({
+  ...raw,
+  id: (raw.id ?? raw._id) as string,   // ✅ fix: accept either field
+} as ExportJob);
+
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLLS = 20;
 
@@ -40,11 +43,18 @@ const pollJob = async (
   jobId: string,
   onUpdate: (job: ExportJob) => void
 ): Promise<void> => {
+  // ✅ fix: guard against undefined before even starting
+  if (!jobId || jobId === "undefined") {
+    console.error("pollJob called with invalid jobId:", jobId);
+    return;
+  }
+
   for (let i = 0; i < MAX_POLLS; i++) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     try {
       const res = await axiosInstance.get(`/admin/exports/${jobId}`);
-      const job: ExportJob = res.data?.data ?? res.data;
+      const raw = res.data?.data ?? res.data;
+      const job = normalizeJob(raw);
       onUpdate(job);
       if (job.status === "ready" || job.status === "failed") return;
     } catch {
@@ -59,7 +69,6 @@ export const useExports = (): UseExportsReturn => {
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
-  // ── Load existing export jobs from the server
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -67,10 +76,10 @@ export const useExports = (): UseExportsReturn => {
       setError(null);
       try {
         const res = await axiosInstance.get("/admin/exports");
-        const data: ExportJob[] = Array.isArray(res.data)
+        const raw: Record<string, unknown>[] = Array.isArray(res.data)
           ? res.data
           : res.data?.data ?? [];
-        if (!cancelled) setJobs(data);
+        if (!cancelled) setJobs(raw.map(normalizeJob)); // ✅ normalize on load too
       } catch (err: unknown) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load export jobs");
@@ -81,26 +90,21 @@ export const useExports = (): UseExportsReturn => {
       }
     };
     load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [tick]);
 
-  // ── Update a single job in state (used by the poller)
   const updateJob = useCallback((updated: ExportJob) => {
     setJobs((prev) =>
       prev.map((j) => (j.id === updated.id ? updated : j))
     );
   }, []);
 
-  // ── POST a new export job to the server, then poll until done
   const triggerExport = useCallback(
     async (type: ExportJob["type"], format: ExportJob["format"]) => {
-      // Optimistically add a queued placeholder
       const tempId = `job-${Date.now()}`;
       const placeholder: ExportJob = {
         id: tempId,
-        requestedBy: "",        // server will fill this from the JWT
+        requestedBy: "",
         requestedAt: Date.now(),
         type,
         format,
@@ -111,19 +115,23 @@ export const useExports = (): UseExportsReturn => {
 
       try {
         const res = await axiosInstance.post("/admin/exports", { type, format });
-        const created: ExportJob = res.data?.data ?? res.data;
+        const raw = res.data?.data ?? res.data;
+        const created = normalizeJob(raw); // ✅ normalize _id → id
 
-        // Replace the placeholder with the real job from the server
+        // ✅ Fail loudly if the server didn't return a usable ID
+        if (!created.id) {
+          console.error("Export job created but no id returned:", raw);
+          throw new Error("Server did not return a job ID");
+        }
+
         setJobs((prev) =>
           prev.map((j) => (j.id === tempId ? created : j))
         );
 
-        // Poll until the server finishes generating the file
         if (created.status === "queued" || created.status === "processing") {
           await pollJob(created.id, updateJob);
         }
       } catch (err: unknown) {
-        // Mark placeholder as failed
         setJobs((prev) =>
           prev.map((j) =>
             j.id === tempId ? { ...j, status: "failed" as const } : j
@@ -135,13 +143,11 @@ export const useExports = (): UseExportsReturn => {
     [updateJob]
   );
 
-  // ── Incidents CSV — try server first, fall back to browser-side generation
   const exportIncidentsCSV = useCallback(
     async (incidents: FleetIncident[]) => {
       try {
         await triggerExport("incidents", "csv");
       } catch {
-        // Server export failed — generate locally so the user still gets a file
         downloadCSV(
           `incidents_${Date.now()}.csv`,
           incidents.map((i) => ({
@@ -160,7 +166,6 @@ export const useExports = (): UseExportsReturn => {
     [triggerExport]
   );
 
-  // ── Audit CSV — try server first, fall back to browser-side generation
   const exportAuditCSV = useCallback(
     async (entries: AuditEntry[]) => {
       try {

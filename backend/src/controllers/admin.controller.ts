@@ -232,17 +232,49 @@ export const getAllIncidents = async (req: Request, res: Response) => {
 
 export const getSystemHealth = async (_req: Request, res: Response) => {
   try {
+    const os = require('os');
     const mongoose = require('mongoose');
+
     const dbStatus = mongoose.connection?.readyState === 1 ? 'connected' : 'disconnected';
+
+    // CPU usage — sample over 100ms
+    const cpuUsage = await new Promise<number>(resolve => {
+      const start = os.cpus();
+      setTimeout(() => {
+        const end = os.cpus();
+        let idle = 0, total = 0;
+        end.forEach((cpu: any, i: number) => {
+          Object.keys(cpu.times).forEach((t: string) => {
+            total += cpu.times[t] - start[i].times[t];
+          });
+          idle += cpu.times.idle - start[i].times.idle;
+        });
+        resolve(Math.round((1 - idle / total) * 100));
+      }, 100);
+    });
+
+    // Memory
+    const rawMem = process.memoryUsage();
+    const totalSystemMem = os.totalmem();
+    const freeSystemMem  = os.freemem();
+
+    // Active MongoDB connections
+    const activeConnections = mongoose.connection?.pool?.totalConnectionCount
+      ?? (mongoose.connections?.length || 0);
 
     return res.json({
       success: true,
       data: {
-        status:      'healthy',
-        timestamp:   new Date().toISOString(),
-        uptime:      process.uptime(),
-        memory:      process.memoryUsage(),
-        database:    dbStatus,
+        status:            'healthy',
+        timestamp:         new Date().toISOString(),
+        uptime:            Math.floor(process.uptime()),   // ✅ integer seconds
+        dbStatus,                                          // ✅ renamed from 'database'
+        cpuUsage,                                          // ✅ new
+        memoryUsage: {                                     // ✅ matches frontend shape
+          used:  Math.round((totalSystemMem - freeSystemMem) / 1024 / 1024),
+          total: Math.round(totalSystemMem / 1024 / 1024),
+        },
+        activeConnections,                                 // ✅ new
         environment: process.env.NODE_ENV,
         version:     process.env.npm_package_version || '1.0.0',
       },

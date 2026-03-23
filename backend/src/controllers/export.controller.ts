@@ -263,26 +263,49 @@ export const getExportJobById = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, error: 'Failed to fetch export job' });
   }
 };
-
 // ─── GET /admin/exports/:id/download ─────────────────────────────────────────
 
 export const downloadExport = async (req: Request, res: Response) => {
   try {
     const job = await ExportJob.findById(req.params.id).lean();
 
-    if (!job)                    return res.status(404).json({ success: false, error: 'Export job not found' });
-    if (job.status !== 'ready')  return res.status(400).json({ success: false, error: 'Export not ready yet' });
-    if (!job.filePath || !fs.existsSync(job.filePath)) {
+    if (!job) {
+      return res.status(404).json({ success: false, error: 'Export job not found' });
+    }
+    if (job.status !== 'ready') {
+      return res.status(400).json({ success: false, error: 'Export not ready yet' });
+    }
+    if (!job.filePath) {
+      return res.status(404).json({ success: false, error: 'No file path recorded for this job' });
+    }
+
+    // ✅ Ensure absolute path (handles both Unix and Windows)
+    const absolutePath = path.isAbsolute(job.filePath)
+      ? job.filePath
+      : path.resolve(process.cwd(), job.filePath);
+
+    if (!fs.existsSync(absolutePath)) {
+      logger.error(`Export file missing on disk: ${absolutePath}`);
       return res.status(404).json({ success: false, error: 'Export file not found on server' });
     }
 
-    const filename = path.basename(job.filePath);
+    const filename = path.basename(absolutePath);
     const mimeType = job.format === 'pdf' ? 'application/pdf' : 'text/csv';
 
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', mimeType);
+    res.setHeader('Cache-Control', 'no-cache');
 
-    return res.sendFile(job.filePath);
+    // ✅ Use createReadStream instead of sendFile — works reliably on Windows
+    const stream = fs.createReadStream(absolutePath);
+    stream.on('error', (err) => {
+      logger.error('File stream error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, error: 'Failed to stream file' });
+      }
+    });
+    return stream.pipe(res);
+
   } catch (error) {
     logger.error('Download export error:', error);
     return res.status(500).json({ success: false, error: 'Failed to download export' });

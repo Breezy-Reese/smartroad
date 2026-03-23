@@ -89,8 +89,22 @@ const IncidentSchema = new mongoose.Schema({
 
 IncidentSchema.index({ location: '2dsphere' });
 
-const User = mongoose.model('User', UserSchema);
+// ── Audit Log Schema (matches your AuditLog.model.ts)
+const AuditLogSchema = new mongoose.Schema({
+  actorId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  actorName: String,
+  actorRole: String,
+  action:    String,
+  target:    String,
+  targetId:  String,
+  ipAddress: String,
+  userAgent: String,
+  metadata:  mongoose.Schema.Types.Mixed,
+}, { timestamps: true });
+
+const User     = mongoose.model('User',     UserSchema);
 const Incident = mongoose.model('Incident', IncidentSchema);
+const AuditLog = mongoose.model('AuditLog', AuditLogSchema);
 
 /* ============================================================
    HELPERS
@@ -126,13 +140,14 @@ async function seedDatabase() {
     console.log('🧹 Clearing existing data...');
     await User.deleteMany({});
     await Incident.deleteMany({});
+    await AuditLog.deleteMany({});
     console.log('✅ Cleared existing data\n');
 
     const password = await hashPassword('Password123!');
 
     /* ===== ADMIN ===== */
     console.log('👤 Seeding Admin...');
-    await User.create({
+    const admin = await User.create({
       name: 'System Admin', email: 'admin@smartroad.com',
       password, role: 'admin', phone: '+254700000001',
     });
@@ -243,17 +258,18 @@ async function seedDatabase() {
     console.log(`  ✅ ${responders.length} responders seeded\n`);
 
     /* ===== AMBULANCES ===== */
-console.log('🚑 Seeding Ambulances...');
-const { Ambulance } = require('./models/Ambulance.model');
-await Ambulance.deleteMany({});
-await Ambulance.insertMany([
-  { plateNumber: 'KCA 001A', make: 'Toyota', ambulanceModel: 'HiAce', year: 2022, status: 'available', driverName: 'Alex Njoroge', location: { lat: -1.2921, lng: 36.8219 } },
-  { plateNumber: 'KCB 002B', make: 'Mercedes', ambulanceModel: 'Sprinter', year: 2021, status: 'dispatched', driverName: 'Mercy Akinyi', location: { lat: -1.3031, lng: 36.7073 } },
-  { plateNumber: 'KCC 003C', make: 'Ford', ambulanceModel: 'Transit', year: 2020, status: 'maintenance', driverName: 'Brian Kipchoge' },
-  { plateNumber: 'KCD 004D', make: 'Toyota', ambulanceModel: 'HiAce', year: 2023, status: 'available', driverName: 'Susan Chebet', location: { lat: -1.2636, lng: 36.8030 } },
-  { plateNumber: 'KCE 005E', make: 'Nissan', ambulanceModel: 'Urvan', year: 2019, status: 'offline' },
-]);
-console.log('  ✅ 5 ambulances seeded\n');
+    console.log('🚑 Seeding Ambulances...');
+    const { Ambulance } = require('./models/Ambulance.model');
+    await Ambulance.deleteMany({});
+    await Ambulance.insertMany([
+      { plateNumber: 'KCA 001A', make: 'Toyota',   ambulanceModel: 'HiAce',   year: 2022, status: 'available',    driverName: 'Alex Njoroge',   location: { lat: -1.2921, lng: 36.8219 } },
+      { plateNumber: 'KCB 002B', make: 'Mercedes', ambulanceModel: 'Sprinter',year: 2021, status: 'dispatched',   driverName: 'Mercy Akinyi',   location: { lat: -1.3031, lng: 36.7073 } },
+      { plateNumber: 'KCC 003C', make: 'Ford',     ambulanceModel: 'Transit', year: 2020, status: 'maintenance',  driverName: 'Brian Kipchoge' },
+      { plateNumber: 'KCD 004D', make: 'Toyota',   ambulanceModel: 'HiAce',   year: 2023, status: 'available',    driverName: 'Susan Chebet',   location: { lat: -1.2636, lng: 36.8030 } },
+      { plateNumber: 'KCE 005E', make: 'Nissan',   ambulanceModel: 'Urvan',   year: 2019, status: 'offline' },
+    ]);
+    console.log('  ✅ 5 ambulances seeded\n');
+
     /* ===== INCIDENTS ===== */
     console.log('🚨 Seeding Incidents...');
 
@@ -267,12 +283,12 @@ console.log('  ✅ 5 ambulances seeded\n');
     const incidents = [];
 
     for (let i = 0; i < 20; i++) {
-      const driver    = drivers[i % drivers.length];
-      const location  = nairobiLocations[i % nairobiLocations.length];
-      const status    = statuses[i % statuses.length];
-      const severity  = severities[i % severities.length];
-      const type      = incidentTypes[i % incidentTypes.length];
-      const hoursAgo  = randomBetween(0.5, 72);
+      const driver   = drivers[i % drivers.length];
+      const location = nairobiLocations[i % nairobiLocations.length];
+      const status   = statuses[i % statuses.length];
+      const severity = severities[i % severities.length];
+      const type     = incidentTypes[i % incidentTypes.length];
+      const hoursAgo = randomBetween(0.5, 72);
       const timestamp = new Date(Date.now() - hoursAgo * 3600000);
 
       const incident: any = {
@@ -337,6 +353,72 @@ console.log('  ✅ 5 ambulances seeded\n');
     await Incident.insertMany(incidents);
     console.log(`  ✅ ${incidents.length} incidents seeded\n`);
 
+    /* ===== AUDIT LOGS ===== */
+    console.log('📋 Seeding Audit Logs...');
+
+    const auditActions = [
+      { action: 'USER_LOGIN',       targetPrefix: 'User login' },
+      { action: 'USER_UPDATED',     targetPrefix: 'User updated' },
+      { action: 'USER_ACTIVATED',   targetPrefix: 'User activated' },
+      { action: 'USER_DEACTIVATED', targetPrefix: 'User deactivated' },
+      { action: 'INCIDENT_VIEWED',  targetPrefix: 'Incident viewed' },
+      { action: 'EXPORT_CREATED',   targetPrefix: 'Export job created' },
+      { action: 'USER_DELETED',     targetPrefix: 'User deleted' },
+      { action: 'DASHBOARD_VIEWED', targetPrefix: 'Dashboard accessed' },
+    ];
+
+    const ipAddresses = [
+      '127.0.0.1', '192.168.1.10', '192.168.1.15',
+      '10.0.0.5',  '41.90.64.12',  '196.201.214.8',
+    ];
+
+    const auditLogs = [];
+
+    for (let i = 0; i < 30; i++) {
+      const hoursAgo  = randomBetween(0.5, 168); // up to 7 days ago
+      const createdAt = new Date(Date.now() - hoursAgo * 3600000);
+      const entry     = auditActions[i % auditActions.length];
+
+      // Mix of admin and hospital actors
+      const isAdmin  = i % 3 !== 0;
+      const actor    = isAdmin ? admin : hospitals[i % hospitals.length];
+      const actorRole = isAdmin ? 'admin' : 'hospital';
+
+      // Pick a relevant target
+      let target   = '';
+      let targetId = '';
+      if (entry.action.startsWith('USER')) {
+        const u = drivers[i % drivers.length];
+        target   = `${u.name} (${u.email})`;
+        targetId = String(u._id);
+      } else if (entry.action === 'INCIDENT_VIEWED') {
+        target   = `INC-2024-${String((i % 20) + 1).padStart(4, '0')}`;
+        targetId = String(incidents[i % incidents.length].incidentId ?? '');
+      } else if (entry.action === 'EXPORT_CREATED') {
+        target   = `${i % 2 === 0 ? 'incidents' : 'audit_log'} CSV export`;
+        targetId = `export-seed-${i}`;
+      } else {
+        target = 'Admin Panel';
+      }
+
+      auditLogs.push({
+        actorId:   actor._id,
+        actorName: actor.name,
+        actorRole,
+        action:    entry.action,
+        target,
+        targetId,
+        ipAddress: ipAddresses[i % ipAddresses.length],
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/146.0.0.0',
+        metadata:  { seeded: true },
+        createdAt,
+        updatedAt: createdAt,
+      });
+    }
+
+    await AuditLog.insertMany(auditLogs);
+    console.log(`  ✅ ${auditLogs.length} audit log entries seeded\n`);
+
     console.log('═══════════════════════════════════════════');
     console.log('✅ DATABASE SEEDED SUCCESSFULLY!');
     console.log('═══════════════════════════════════════════');
@@ -348,7 +430,7 @@ console.log('  ✅ 5 ambulances seeded\n');
     console.log('  hospital3@smartroad.com  → Aga Khan University Hospital');
     console.log('\nDRIVERS:   driver1 ~ driver5@smartroad.com');
     console.log('RESPONDERS: responder1 ~ responder5@smartroad.com');
-    console.log(`\n📊 Users: ${1 + hospitals.length + drivers.length + responders.length} | Incidents: ${incidents.length}`);
+    console.log(`\n📊 Users: ${1 + hospitals.length + drivers.length + responders.length} | Incidents: ${incidents.length} | Audit logs: ${auditLogs.length}`);
     console.log('═══════════════════════════════════════════\n');
 
     await mongoose.disconnect();
