@@ -3,6 +3,7 @@ import { useSocket } from "./useSocket";
 import { useLocation } from "./useLocation";
 import { useAuth } from "./useAuth";
 import { emergencyService } from "../services/api/emergency.service";
+import { notificationService } from "../services/api/notification.service";
 import {
   Incident,
   CreateIncidentDto,
@@ -195,6 +196,13 @@ export const useEmergency = (): UseEmergencyReturn => {
           setCurrentIncident(incident);
           setIsEmergencyActive(true);
 
+          // ── Trigger escalation to create delivery receipts ──
+          try {
+            await notificationService.triggerEscalation(incident._id);
+          } catch (escalationErr) {
+            console.error("Escalation trigger failed:", escalationErr);
+          }
+
           if (connected) {
             emit("panic-button", {
               driverId: user._id,
@@ -242,6 +250,13 @@ export const useEmergency = (): UseEmergencyReturn => {
         setCurrentIncident(incident);
         setIsEmergencyActive(true);
 
+        // ── Trigger escalation to create delivery receipts ──
+        try {
+          await notificationService.triggerEscalation(incident._id);
+        } catch (escalationErr) {
+          console.error("Escalation trigger failed:", escalationErr);
+        }
+
         if (connected) {
           emit("panic-button", {
             driverId: user!._id,
@@ -275,6 +290,13 @@ export const useEmergency = (): UseEmergencyReturn => {
 
     try {
       await emergencyService.cancelEmergency(currentIncident._id);
+
+      // ── Resolve escalation to stop further notifications ──
+      try {
+        await notificationService.resolveEscalation(currentIncident._id);
+      } catch (escalationErr) {
+        console.error("Escalation resolve failed:", escalationErr);
+      }
 
       setIsEmergencyActive(false);
       setCurrentIncident(null);

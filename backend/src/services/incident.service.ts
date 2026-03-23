@@ -317,17 +317,22 @@ if (params.severity?.length) {
           }
         }
       ]);
+const typeStats = await Incident.aggregate([
+  { $match: { detectedAt: { $gte: startDate } } },
+  { $group: { _id: '$type', count: { $sum: 1 } } }
+]);
 
-      const avgResponseTime = await this.calculateAverageResponseTime(startDate);
+const avgResponseTime = await this.calculateAverageResponseTime(startDate);
 
-      return {
-        period,
-        startDate,
-        total,
-        bySeverity: severityStats,
-        byStatus: statusStats,
-        averageResponseTime: avgResponseTime
-      };
+return {
+  period,
+  startDate,
+  total,
+  byType:     typeStats,       // ✅ new
+  bySeverity: severityStats,
+  byStatus:   statusStats,
+  averageResponseTime: avgResponseTime,
+};
     } catch (error) {
       logger.error('Get incident stats error:', error);
       throw error;

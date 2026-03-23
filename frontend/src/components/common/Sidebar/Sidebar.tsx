@@ -39,7 +39,7 @@ const navItems: NavItem[] = [
   { name: 'Ambulances', to: '/hospital/ambulances',  icon: MapIcon,               roles: ['hospital'] },
   { name: 'Analytics',  to: '/hospital/analytics',   icon: ChartBarIcon,          roles: ['hospital'] },
   { name: 'Bed Tracker',  to: '/hospital/beds',      icon: UserGroupIcon,         roles: ['hospital'] },
-  { name: 'ETA Countdown',to: '/hospital/eta',       icon: ClockIcon,             roles: ['hospital'] },
+  { name: 'ETA Countdown', to: '/hospital/eta', icon: ClockIcon, roles: ['hospital'] },
   { name: 'Shift Manager',to: '/hospital/shifts',    icon: WrenchScrewdriverIcon, roles: ['hospital'] },
   { name: 'Settings',     to: '/hospital/settings',  icon: Cog6ToothIcon,         roles: ['hospital'] },
 

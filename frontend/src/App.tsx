@@ -42,10 +42,9 @@ import ResponderList from './components/common/hospital/Responders/ResponderList
 import ResponseAnalytics from './components/common/hospital/Analytics/ResponseAnalytics';
 import HospitalProfile from './components/common/hospital/Settings/HospitalProfile';
 import BedTracker from './components/common/hospital/BedTracker';
-import ETACountdown from './components/common/hospital/ETACountdown';
 import ShiftManager from './components/common/hospital/ShiftManager';
 import HospitalIncidents from './components/common/hospital/Incidents/HospitalIncidents';
-
+import ETAPage from './components/common/hospital/ETAPage';
 // Admin — existing
 import AdminDashboard from './components/common/admin/Dashboard/AdminDashboard';
 import UserManagement from './components/common/admin/Users/UserManagement';
@@ -134,10 +133,9 @@ const App: React.FC = () => {
               <Route path="/hospital/ambulances" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><AmbulanceList /></ProtectedRoute>} />
               <Route path="/hospital/analytics" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><ResponseAnalytics /></ProtectedRoute>} />
               <Route path="/hospital/beds" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><BedTracker /></ProtectedRoute>} />
-              <Route path="/hospital/eta" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><ETACountdown /></ProtectedRoute>} />
               <Route path="/hospital/shifts" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><ShiftManager /></ProtectedRoute>} />
               <Route path="/hospital/settings" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><HospitalProfile /></ProtectedRoute>} />
-
+              <Route path="/hospital/eta" element={<ProtectedRoute allowedRoles={['hospital', 'admin']}><ETAPage /></ProtectedRoute>} />
               {/* ── Admin Routes — existing ── */}
               <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
               <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin']}><UserManagement /></ProtectedRoute>} />

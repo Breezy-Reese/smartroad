@@ -194,11 +194,21 @@ const HospitalDashboard: React.FC = () => {
                     </span>
                   </div>
                   <ETACountdown
-                    etaMinutes={responder?.eta ?? 8}
-                    dispatchedAt={responder?.dispatchedAt ?? incident.timestamp ?? new Date()}
-                    incidentId={incident._id}
-                    responderName={responder?.name}
-                  />
+  etaMinutes={
+    typeof responder?.eta === 'number' && !isNaN(responder.eta)
+      ? responder.eta
+      : 8
+  }
+  dispatchedAt={
+    responder?.dispatchedAt
+      ? new Date(responder.dispatchedAt)
+      : incident.timestamp
+        ? new Date(incident.timestamp)
+        : new Date()
+  }
+  incidentId={incident._id}
+  responderName={responder?.name}
+/>
                   {incident.locationAddress && (
                     <p className="text-xs text-gray-400 mt-2 truncate">{incident.locationAddress}</p>
                   )}

@@ -111,6 +111,8 @@ router.get(
   hospitalController.getHospitalStats
 );
 
+router.get('/beds',   authenticate, requireHospital, hospitalController.getHospitalBeds);
+router.get('/shifts', authenticate, requireHospital, hospitalController.getHospitalShifts);
 
 // Admin-only analytics for any hospital
 router.get(
@@ -120,6 +122,7 @@ router.get(
   validate(hospitalIdParamValidation),
   hospitalController.getHospitalAnalytics
 );
+
 
 /* ============================================================
    LOCATION MANAGEMENT

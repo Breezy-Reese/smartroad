@@ -4,6 +4,13 @@ import mongoose, { Schema, Document, Types, Model } from "mongoose";
    TYPES
 ============================================================ */
 
+export interface IWard {
+  name: string;
+  available: number;
+  total: number;
+  category: 'icu' | 'emergency' | 'general' | 'theatre';
+}
+
 export interface IHospitalStats extends Document {
   hospitalId: Types.ObjectId;
 
@@ -17,8 +24,9 @@ export interface IHospitalStats extends Document {
   availableAmbulances: number;
   availableResponders: number;
 
-  lastUpdated: Date;
+  wards: IWard[];   // ✅ added
 
+  lastUpdated: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,74 +35,49 @@ export interface IHospitalStats extends Document {
    SCHEMA
 ============================================================ */
 
+const WardSchema = new Schema<IWard>(
+  {
+    name:      { type: String, required: true },
+    available: { type: Number, default: 0 },
+    total:     { type: Number, default: 0 },
+    category:  { type: String, enum: ['icu', 'emergency', 'general', 'theatre'], required: true },
+  },
+  { _id: false }
+);
+
 const HospitalStatsSchema = new Schema<IHospitalStats>(
   {
     hospitalId: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true  // This creates the index automatically
-      // REMOVED: index: true - handled by unique:true
+      unique: true,
     },
 
-    totalIncidents: {
-      type: Number,
-      default: 0
-    },
+    totalIncidents:    { type: Number, default: 0 },
+    activeIncidents:   { type: Number, default: 0 },
+    resolvedIncidents: { type: Number, default: 0 },
 
-    activeIncidents: {
-      type: Number,
-      default: 0
-      // REMOVED: index: true - index added in INDEXES section
-    },
+    averageResponseTime: { type: Number, default: 0 },
 
-    resolvedIncidents: {
-      type: Number,
-      default: 0
-    },
+    availableBeds:       { type: Number, default: 0 },
+    availableAmbulances: { type: Number, default: 0 },
+    availableResponders: { type: Number, default: 0 },
 
-    averageResponseTime: {
-      type: Number,
-      default: 0
-    },
+    wards: { type: [WardSchema], default: [] },  // ✅ added
 
-    availableBeds: {
-      type: Number,
-      default: 0
-    },
-
-    availableAmbulances: {
-      type: Number,
-      default: 0
-    },
-
-    availableResponders: {
-      type: Number,
-      default: 0
-    },
-
-    lastUpdated: {
-      type: Date,
-      default: Date.now
-    }
+    lastUpdated: { type: Date, default: Date.now },
   },
-  {
-    timestamps: true
-  }
+  { timestamps: true }
 );
 
 /* ============================================================
    INDEXES
 ============================================================ */
 
-// All indexes defined here (single source of truth)
-// REMOVED: HospitalStatsSchema.index({ hospitalId: 1 }, { unique: true }); 
-// The unique index is already created by unique:true in the field definition
-
-// Additional performance indexes
 HospitalStatsSchema.index({ activeIncidents: 1 });
 HospitalStatsSchema.index({ availableBeds: 1 });
-HospitalStatsSchema.index({ lastUpdated: -1 }); // Added for sorting by last updated
+HospitalStatsSchema.index({ lastUpdated: -1 });
 
 /* ============================================================
    MIDDLEWARE

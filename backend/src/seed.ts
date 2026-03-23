@@ -352,6 +352,69 @@ async function seedDatabase() {
 
     await Incident.insertMany(incidents);
     console.log(`  ✅ ${incidents.length} incidents seeded\n`);
+    /* ===== HOSPITAL STATS (Beds) ===== */
+    console.log('🛏️  Seeding Hospital Stats...');
+    const { HospitalStats } = require('./models/Hospital.model');
+    await HospitalStats.deleteMany({});
+    await HospitalStats.insertMany([
+      {
+        hospitalId: hospitals[0]._id,
+        beds: 89,
+        availableBeds: 31,
+        ambulances: 5,
+        availableAmbulances: 2,
+        responders: 10,
+        availableResponders: 6,
+        activeIncidents: 3,
+        averageResponseTime: 12,
+        lastUpdated: new Date(),
+        wards: [
+          { name: 'ICU',               available: 2,  total: 10, category: 'icu'       },
+          { name: 'Emergency',         available: 7,  total: 20, category: 'emergency' },
+          { name: 'General Ward A',    available: 12, total: 30, category: 'general'   },
+          { name: 'General Ward B',    available: 8,  total: 25, category: 'general'   },
+          { name: 'Operating Theatre', available: 2,  total: 4,  category: 'theatre'   },
+        ],
+      },
+      {
+        hospitalId: hospitals[1]._id,
+        beds: 120,
+        availableBeds: 45,
+        ambulances: 8,
+        availableAmbulances: 3,
+        responders: 15,
+        availableResponders: 9,
+        activeIncidents: 5,
+        averageResponseTime: 15,
+        lastUpdated: new Date(),
+        wards: [
+          { name: 'ICU',               available: 4,  total: 15, category: 'icu'       },
+          { name: 'Emergency',         available: 10, total: 25, category: 'emergency' },
+          { name: 'General Ward A',    available: 18, total: 40, category: 'general'   },
+          { name: 'General Ward B',    available: 11, total: 35, category: 'general'   },
+          { name: 'Operating Theatre', available: 2,  total: 5,  category: 'theatre'   },
+        ],
+      },
+      {
+        hospitalId: hospitals[2]._id,
+        beds: 60,
+        availableBeds: 22,
+        ambulances: 4,
+        availableAmbulances: 2,
+        responders: 8,
+        availableResponders: 5,
+        activeIncidents: 2,
+        averageResponseTime: 10,
+        lastUpdated: new Date(),
+        wards: [
+          { name: 'ICU',               available: 1,  total: 8,  category: 'icu'       },
+          { name: 'Emergency',         available: 5,  total: 15, category: 'emergency' },
+          { name: 'General Ward A',    available: 10, total: 25, category: 'general'   },
+          { name: 'Operating Theatre', available: 1,  total: 3,  category: 'theatre'   },
+        ],
+      },
+    ]);
+    console.log('  ✅ Hospital stats + ward data seeded\n');
 
     /* ===== AUDIT LOGS ===== */
     console.log('📋 Seeding Audit Logs...');

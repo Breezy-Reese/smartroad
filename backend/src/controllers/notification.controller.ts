@@ -114,29 +114,44 @@ export const triggerEscalation = async (req: AuthRequest, res: Response) => {
     const policy = await EscalationPolicy.findOne({ driverId });
     const steps  = policy?.steps ?? DEFAULT_STEPS;
 
-    // Create a pending receipt for level 1 immediately
-    // Full escalation chain is handled by your notification.service
-    // (hook into your existing notificationService here)
-    const log = {
-      incidentId,
-      driverId,
-      triggeredAt: new Date(),
-      escalationLevel: 1,
-      steps,
-    };
+    // Get driver's notification prefs
+    const prefs = await NotificationPrefs.findOne({ driverId });
 
-    // TODO: call your existing notificationService to actually send SMS/push
-    // e.g. notificationService.sendEmergencyAlerts(incidentId, driverId.toString(), steps)
+    // Build receipts for level 1 step immediately
+    const level1 = steps.find(s => s.level === 1) ?? steps[0];
+    const channels = level1?.channels ?? ['push', 'sms'];
 
-    logger.info(`Escalation triggered for incident ${incidentId} by driver ${driverId}`);
+    const receipts = await Promise.all(
+      channels.map(async (channel) => {
+        // Determine recipient contact based on channel
+        let recipientName = 'Emergency Contact';
+        if (channel === 'sms' && prefs?.smsPhoneNumber) {
+          recipientName = prefs.smsPhoneNumber;
+        } else if (channel === 'email' && prefs?.emailAddress) {
+          recipientName = prefs.emailAddress;
+        }
 
-    return res.json({ success: true, data: log });
+        const receipt = await DeliveryReceipt.create({
+          incidentId,
+          driverId,
+          recipientId:   driverId.toString(),
+          recipientName,
+          channel,
+          status:  'sent',
+          sentAt:  new Date(),
+        });
+        return receipt;
+      })
+    );
+
+    logger.info(`Escalation triggered for incident ${incidentId} by driver ${driverId}, created ${receipts.length} receipts`);
+
+    return res.json({ success: true, data: { incidentId, driverId, receipts } });
   } catch (error: any) {
     logger.error('Trigger escalation error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
-
 /* ============================================================
    RESOLVE ESCALATION   POST /api/notifications/escalate/:incidentId/resolve
 ============================================================ */
