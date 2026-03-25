@@ -73,7 +73,7 @@ export const EscalationPolicy = mongoose.model<IEscalationPolicyDocument>(
 
 /* ── Delivery Receipt ── */
 export interface IDeliveryReceiptDocument extends Document {
-  incidentId: Types.ObjectId;
+  incidentId: string;  // ✅ Changed from Types.ObjectId to string
   driverId: Types.ObjectId;
   recipientId: string;
   recipientName: string;
@@ -87,13 +87,13 @@ export interface IDeliveryReceiptDocument extends Document {
 
 const DeliveryReceiptSchema = new Schema<IDeliveryReceiptDocument>(
   {
-    incidentId:    { type: Schema.Types.ObjectId, ref: 'Incident', required: true },
+    incidentId:    { type: String, required: true, index: true }, // ✅ Changed to String type
     driverId:      { type: Schema.Types.ObjectId, ref: 'User', required: true },
     recipientId:   { type: String, required: true },
     recipientName: { type: String, required: true },
     channel:       { type: String, enum: ['push', 'sms', 'call', 'email'], required: true },
     status:        { type: String, enum: ['pending', 'sent', 'delivered', 'failed', 'read'], default: 'pending' },
-    sentAt:        { type: Date },
+    sentAt:        { type: Date, default: Date.now },
     deliveredAt:   { type: Date },
     failureReason: { type: String },
     retryCount:    { type: Number, default: 0 },
@@ -101,8 +101,10 @@ const DeliveryReceiptSchema = new Schema<IDeliveryReceiptDocument>(
   { timestamps: true },
 );
 
+// ✅ Create indexes for better query performance
 DeliveryReceiptSchema.index({ driverId: 1, createdAt: -1 });
 DeliveryReceiptSchema.index({ incidentId: 1 });
+DeliveryReceiptSchema.index({ status: 1 });
 
 export const DeliveryReceipt = mongoose.model<IDeliveryReceiptDocument>(
   'DeliveryReceipt',
