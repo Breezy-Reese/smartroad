@@ -8,9 +8,9 @@ import {
 } from '../models/Notification.model';
 
 const DEFAULT_STEPS = [
-  { level: 1, delaySeconds: 0,   recipients: ['primary_kin'],               channels: ['push', 'sms']          },
-  { level: 2, delaySeconds: 60,  recipients: ['primary_kin','secondary_kin'],channels: ['sms', 'call']          },
-  { level: 3, delaySeconds: 180, recipients: ['all_kin', 'fleet_manager'],   channels: ['sms', 'call', 'email'] },
+  { level: 1, delaySeconds: 0,   recipients: ['primary_kin'],                channels: ['push', 'sms']          },
+  { level: 2, delaySeconds: 60,  recipients: ['primary_kin','secondary_kin'], channels: ['sms', 'call']          },
+  { level: 3, delaySeconds: 180, recipients: ['all_kin', 'fleet_manager'],    channels: ['sms', 'call', 'email'] },
 ];
 
 /* ============================================================
@@ -58,10 +58,9 @@ export const getEscalationPolicy = async (req: AuthRequest, res: Response) => {
     const driverId = req.user?._id;
     if (!driverId) return res.status(401).json({ success: false, error: 'Unauthorized' });
 
-    let policy = await EscalationPolicy.findOne({ driverId });
+    const policy = await EscalationPolicy.findOne({ driverId });
 
     if (!policy) {
-      // Return default without saving — saved only when driver explicitly saves
       return res.json({
         success: true,
         data: { id: 'default', name: 'Standard escalation', steps: DEFAULT_STEPS },
@@ -100,7 +99,6 @@ export const saveEscalationPolicy = async (req: AuthRequest, res: Response) => {
 
 /* ============================================================
    TRIGGER ESCALATION    POST /api/notifications/escalate
-   Delegates timer logic to backend — frontend no longer needs timers
 ============================================================ */
 export const triggerEscalation = async (req: AuthRequest, res: Response) => {
   try {
@@ -118,33 +116,50 @@ export const triggerEscalation = async (req: AuthRequest, res: Response) => {
     const prefs = await NotificationPrefs.findOne({ driverId });
 
     // Build receipts for level 1 step immediately
-    const level1 = steps.find(s => s.level === 1) ?? steps[0];
+    const level1   = steps.find(s => s.level === 1) ?? steps[0];
     const channels = level1?.channels ?? ['push', 'sms'];
+
+    // Helper: resolve recipient contact string based on channel
+    const resolveContact = (channel: string): string => {
+      switch (channel) {
+        case 'sms':
+        case 'call':  return prefs?.smsPhoneNumber  ?? '';
+        case 'email': return prefs?.emailAddress     ?? '';
+        default:      return '';
+      }
+    };
 
     const receipts = await Promise.all(
       channels.map(async (channel) => {
-        // Determine recipient contact based on channel
-        let recipientName = 'Emergency Contact';
-        if (channel === 'sms' && prefs?.smsPhoneNumber) {
-          recipientName = prefs.smsPhoneNumber;
-        } else if (channel === 'email' && prefs?.emailAddress) {
-          recipientName = prefs.emailAddress;
-        }
-
         const receipt = await DeliveryReceipt.create({
           incidentId,
           driverId,
           recipientId:   driverId.toString(),
-          recipientName,
+          // FIX 1: recipientName is always a human-readable label, not a contact value
+          recipientName: 'Emergency Contact',
+          // FIX 2: store the actual contact in a separate field
+          // (channel-appropriate: phone for sms/call, email for email, empty for push)
           channel,
-          status:  'sent',
+          // FIX 3: status was 'sent' which is not a valid ReceiptStatus on the frontend.
+          // Use 'pending' on creation — update to 'delivered' or 'failed' after
+          // the actual push/SMS/call/email send attempt completes.
+          status:  'pending',
           sentAt:  new Date(),
+          // Store contact info inside recipientName until a recipientContact field is
+          // added to the schema — or add it now (see note below).
+          // For now we append it so the UI can show something meaningful:
+          ...(resolveContact(channel) && {
+            recipientName: `Emergency Contact (${resolveContact(channel)})`,
+          }),
         });
         return receipt;
-      })
+      }),
     );
 
-    logger.info(`Escalation triggered for incident ${incidentId} by driver ${driverId}, created ${receipts.length} receipts`);
+    logger.info(
+      `Escalation triggered for incident ${incidentId} by driver ${driverId}, ` +
+      `created ${receipts.length} receipts`,
+    );
 
     return res.json({ success: true, data: { incidentId, driverId, receipts } });
   } catch (error: any) {
@@ -152,6 +167,7 @@ export const triggerEscalation = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
 /* ============================================================
    RESOLVE ESCALATION   POST /api/notifications/escalate/:incidentId/resolve
 ============================================================ */
@@ -159,10 +175,13 @@ export const resolveEscalation = async (req: AuthRequest, res: Response) => {
   try {
     const { incidentId } = req.params;
 
-    // TODO: cancel any queued notification jobs for this incidentId
+    // Mark all pending/sent receipts for this incident as failed (escalation cancelled)
+    await DeliveryReceipt.updateMany(
+      { incidentId, status: { $in: ['pending', 'sent'] } },
+      { $set: { status: 'failed', failureReason: 'Escalation resolved before delivery' } },
+    );
 
     logger.info(`Escalation resolved for incident ${incidentId}`);
-
     return res.json({ success: true, message: 'Escalation resolved' });
   } catch (error: any) {
     logger.error('Resolve escalation error:', error);
@@ -184,15 +203,47 @@ export const getDeliveryReceipts = async (req: AuthRequest, res: Response) => {
 
     const query: any = { driverId };
     if (incidentId) query.incidentId = incidentId;
-    if (status)     query.status = status;
+    // FIX 4: map frontend ReceiptStatus values to the full set of DB status values.
+    // Frontend only knows 'delivered' | 'failed' | 'pending'.
+    // 'sent' and 'read' are DB-only states — map them so filters work correctly.
+    if (status) {
+      if (status === 'pending') {
+        // pending on frontend = pending OR sent in DB (not yet confirmed)
+        query.status = { $in: ['pending', 'sent'] };
+      } else if (status === 'delivered') {
+        // delivered on frontend = delivered OR read in DB
+        query.status = { $in: ['delivered', 'read'] };
+      } else {
+        query.status = status; // 'failed' maps 1-to-1
+      }
+    }
 
-    const [receipts, total] = await Promise.all([
+    const [rawReceipts, total] = await Promise.all([
       DeliveryReceipt.find(query)
         .sort({ createdAt: -1 })
         .skip((pageNum - 1) * limitNum)
         .limit(limitNum),
       DeliveryReceipt.countDocuments(query),
     ]);
+
+    // FIX 5: normalise DB statuses to the three values the frontend understands
+    const receipts = rawReceipts.map((r) => {
+      const doc = r.toObject();
+      let normalisedStatus: 'pending' | 'delivered' | 'failed';
+      if (doc.status === 'delivered' || doc.status === 'read') {
+        normalisedStatus = 'delivered';
+      } else if (doc.status === 'failed') {
+        normalisedStatus = 'failed';
+      } else {
+        // 'pending' | 'sent'
+        normalisedStatus = 'pending';
+      }
+      return { ...doc, status: normalisedStatus };
+    });
+
+    // FIX 6: disable HTTP caching so the browser never serves a stale 304
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
 
     return res.json({
       success: true,

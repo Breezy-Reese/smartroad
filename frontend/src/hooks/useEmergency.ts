@@ -28,11 +28,7 @@ interface UseEmergencyReturn {
 
 interface AccidentDetectionData {
   speed: number;
-  acceleration: {
-    x: number;
-    y: number;
-    z: number;
-  };
+  acceleration: { x: number; y: number; z: number };
   impactForce?: number;
   airbagDeployed?: boolean;
   location: Coordinates;
@@ -71,8 +67,44 @@ export const useEmergency = (): UseEmergencyReturn => {
     }
   };
 
-  /* ---------------- SOCKET EVENTS ---------------- */
+  /* ── Try to get location — never throws, never blocks ── */
+  const tryGetLocation = async (): Promise<Coordinates | null> => {
+    try {
+      if (location) return location;
+      return await Promise.race<Coordinates | null>([
+        getCurrentLocation(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
+      ]);
+    } catch {
+      return null;
+    }
+  };
 
+  /* ── Helper to safely trigger escalation ── */
+  const safelyTriggerEscalation = useCallback(
+    async (incident: Incident | null, context: string): Promise<boolean> => {
+      if (!incident || !incident._id) {
+        console.error(`❌ Cannot trigger escalation (${context}): incident or incident._id is missing`, {
+          incident,
+          hasIncident: !!incident,
+          hasId: !!incident?._id,
+        });
+        return false;
+      }
+
+      try {
+        console.log(`✅ Triggering escalation (${context}) for incident:`, incident._id);
+        await notificationService.triggerEscalation(incident._id);
+        return true;
+      } catch (error) {
+        console.error(`Escalation trigger failed (${context}):`, error);
+        return false;
+      }
+    },
+    []
+  );
+
+  /* ── Socket events ── */
   useEffect(() => {
     if (!socket || !connected) return;
 
@@ -81,24 +113,17 @@ export const useEmergency = (): UseEmergencyReturn => {
         setCurrentIncident(incident);
         setIsEmergencyActive(true);
         playEmergencySound();
-
-        toast.error("🚨 Accident Detected! Emergency services notified.", {
-          duration: 10000,
-        });
+        toast.error("🚨 Accident Detected! Emergency services notified.", { duration: 10000 });
       }
     };
 
     const handleIncidentUpdate = (incident: Incident) => {
       if (incident.driverId === user?._id) {
         setCurrentIncident(incident);
-
         if (incident.status === "resolved" || incident.status === "closed") {
           setIsEmergencyActive(false);
           stopEmergencySound();
-
-          if (incident.status === "resolved") {
-            toast.success("Emergency resolved. Stay safe!");
-          }
+          if (incident.status === "resolved") toast.success("Emergency resolved. Stay safe!");
         }
       }
     };
@@ -112,9 +137,7 @@ export const useEmergency = (): UseEmergencyReturn => {
 
     const handleEmergencyAlert = (alert: EmergencyAlert) => {
       if (user?.role === "hospital") {
-        toast.error(
-          `🚨 New emergency from ${alert.driverName ?? "driver"}`
-        );
+        toast.error(`🚨 New emergency from ${alert.driverName ?? "driver"}`);
       }
     };
 
@@ -131,37 +154,31 @@ export const useEmergency = (): UseEmergencyReturn => {
     };
   }, [socket, connected, user, currentIncident]);
 
-  /* ---------------- FETCH USER INCIDENTS ---------------- */
-
+  /* ── Fetch user incidents on mount ── */
   useEffect(() => {
     const fetchIncidents = async () => {
       if (!user) return;
-
       try {
         const data = await emergencyService.getUserIncidents(user._id);
         setIncidents(data);
       } catch (err) {
-        console.error(err);
+        console.error("Failed to fetch incidents:", err);
       }
     };
-
     fetchIncidents();
   }, [user]);
 
-  /* ---------------- ACCIDENT DETECTION ---------------- */
-
+  /* ── Accident auto-detection ── */
   const checkAccident = useCallback(
     async (data: AccidentDetectionData): Promise<boolean> => {
-      const { speed, acceleration, impactForce, airbagDeployed, location } = data;
+      const { acceleration, impactForce, airbagDeployed, location } = data;
 
       let isAccident = false;
       let severity: "low" | "medium" | "high" | "critical" = "low";
       let confidence = 0;
 
       const totalAcceleration = Math.sqrt(
-        acceleration.x ** 2 +
-          acceleration.y ** 2 +
-          acceleration.z ** 2
+        acceleration.x ** 2 + acceleration.y ** 2 + acceleration.z ** 2
       );
 
       if (impactForce && impactForce > 4) {
@@ -169,13 +186,11 @@ export const useEmergency = (): UseEmergencyReturn => {
         severity = "high";
         confidence += 0.4;
       }
-
       if (airbagDeployed) {
         isAccident = true;
         severity = "critical";
         confidence += 0.5;
       }
-
       if (totalAcceleration > 12) {
         isAccident = true;
         severity = "high";
@@ -196,12 +211,8 @@ export const useEmergency = (): UseEmergencyReturn => {
           setCurrentIncident(incident);
           setIsEmergencyActive(true);
 
-          // ── Trigger escalation to create delivery receipts ──
-          try {
-            await notificationService.triggerEscalation(incident._id);
-          } catch (escalationErr) {
-            console.error("Escalation trigger failed:", escalationErr);
-          }
+          // ✅ Safely trigger escalation with validation
+          await safelyTriggerEscalation(incident, "accident-detection");
 
           if (connected) {
             emit("panic-button", {
@@ -216,94 +227,122 @@ export const useEmergency = (): UseEmergencyReturn => {
 
           toast.error("🚨 Accident detected! Emergency services notified.");
         } catch (err) {
-          console.error(err);
+          console.error("Accident detection error:", err);
+          toast.error("Failed to process accident detection");
         }
       }
 
       return isAccident;
     },
-    [user, connected, emit]
+    [user, connected, emit, safelyTriggerEscalation]
   );
 
-  /* ---------------- TRIGGER PANIC BUTTON ---------------- */
-
+  /* ── Panic button — fire immediately, location attached async ── */
   const triggerEmergency = useCallback(
     async (type: string = "panic"): Promise<void> => {
       setLoading(true);
       setError(null);
 
       try {
-        const currentLocation = location || (await getCurrentLocation());
-
-        if (!currentLocation) throw new Error("Location unavailable");
-
+        // Create incident immediately — location is optional
         const incidentData: CreateIncidentDto = {
           title: "Emergency panic alert",
           description: "Driver triggered emergency panic button",
           type: (type === "panic" ? "other" : "accident") as IncidentType,
           severity: "critical",
-          location: convertCoordinates(currentLocation),
         };
 
         const incident = await emergencyService.createEmergency(incidentData);
 
         setCurrentIncident(incident);
         setIsEmergencyActive(true);
+        playEmergencySound();
 
-        // ── Trigger escalation to create delivery receipts ──
-        try {
-          await notificationService.triggerEscalation(incident._id);
-        } catch (escalationErr) {
-          console.error("Escalation trigger failed:", escalationErr);
-        }
+        // ✅ Safely trigger escalation with validation
+        await safelyTriggerEscalation(incident, "panic-button");
 
+        // Emit socket event with best available location (may be null)
         if (connected) {
           emit("panic-button", {
             driverId: user!._id,
-            location: currentLocation,
+            location: location ?? null,
             timestamp: new Date(),
           });
         }
 
-        playEmergencySound();
+        // Confirm success to the driver immediately
+        toast.success("🚨 Emergency services notified!");
 
-        const hospitals = await emergencyService.getNearbyHospitals(currentLocation);
-        setNearbyHospitals(hospitals);
+        // Get location in the background — never blocks the trigger above
+        tryGetLocation().then(async (coords) => {
+          if (!coords) {
+            toast("📍 Location unavailable — incident logged without coordinates.", {
+              icon: "⚠️",
+              duration: 5000,
+            });
+            return;
+          }
 
-        toast.success("Emergency services notified 🚨");
+          // Patch the incident with location once we have it
+          try {
+            await emergencyService.updateIncidentLocation(
+              incident._id,
+              convertCoordinates(coords)
+            );
+          } catch (e) {
+            console.error("Failed to patch incident location:", e);
+          }
+
+          // Update socket with confirmed location
+          if (connected) {
+            emit("location-update", { incidentId: incident._id, location: coords });
+          }
+
+          // Now fetch nearby hospitals
+          try {
+            const hospitals = await emergencyService.getNearbyHospitals(coords);
+            setNearbyHospitals(hospitals);
+          } catch (e) {
+            console.error("Failed to fetch nearby hospitals:", e);
+          }
+        });
       } catch (err: any) {
+        console.error("Emergency trigger error:", err);
         setError(err.message);
-        toast.error("Failed to trigger emergency");
+        toast.error("Failed to trigger emergency — please call emergency services directly.");
       } finally {
         setLoading(false);
       }
     },
-    [user, location, getCurrentLocation, connected, emit]
+    [user, location, getCurrentLocation, connected, emit, safelyTriggerEscalation]
   );
 
-  /* ---------------- CANCEL EMERGENCY ---------------- */
-
+  /* ── Cancel emergency ── */
   const cancelEmergency = useCallback(async (): Promise<void> => {
-    if (!currentIncident) return;
+    if (!currentIncident) {
+      console.warn("Cannot cancel emergency: no active incident");
+      return;
+    }
 
     setLoading(true);
 
     try {
       await emergencyService.cancelEmergency(currentIncident._id);
 
-      // ── Resolve escalation to stop further notifications ──
+      // Safely resolve escalation
       try {
+        console.log(`✅ Resolving escalation for incident:`, currentIncident._id);
         await notificationService.resolveEscalation(currentIncident._id);
-      } catch (escalationErr) {
-        console.error("Escalation resolve failed:", escalationErr);
+      } catch (e) {
+        console.error("Escalation resolve failed:", e);
       }
 
       setIsEmergencyActive(false);
       setCurrentIncident(null);
       stopEmergencySound();
-
       toast.success("Emergency cancelled");
     } catch (err: any) {
+      console.error("Cancel emergency error:", err);
       setError(err.message);
       toast.error("Failed to cancel emergency");
     } finally {

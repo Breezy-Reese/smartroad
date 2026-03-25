@@ -20,57 +20,77 @@ export class IncidentService {
 
   private readonly SEVERITY_THRESHOLDS = {
     critical: { impactForce: 15, speed: 80 },
-    high: { impactForce: 10, speed: 60 },
-    medium: { impactForce: 5, speed: 40 },
-    low: { impactForce: 2, speed: 20 },
+    high:     { impactForce: 10, speed: 60 },
+    medium:   { impactForce: 5,  speed: 40 },
+    low:      { impactForce: 2,  speed: 20 },
   };
 
   // ================= CREATE INCIDENT =================
   async createIncident(
     incidentData: ICreateIncidentDTO,
-    driverId: string
+    driverId: string,
   ): Promise<IIncident> {
     try {
       const driver = await User.findById(driverId);
-
-      if (!driver) {
-        throw new Error('Driver not found');
-      }
+      if (!driver) throw new Error('Driver not found');
 
       const severity =
         incidentData.severity ||
         this.calculateSeverity(
-          incidentData.impactForce || 0,
-          incidentData.speed || 0,
-          incidentData.airbagDeployed || false
+          incidentData.impactForce    || 0,
+          incidentData.speed          || 0,
+          incidentData.airbagDeployed || false,
         );
+
+      // location is optional on create — the frontend patches it in once GPS
+      // resolves via PATCH /:incidentId/location.
+      // If location IS provided, convert { latitude, longitude } → GeoJSON.
+      let geoLocation: { type: 'Point'; coordinates: [number, number] } | undefined;
+
+      if (
+        incidentData.location?.latitude  != null &&
+        incidentData.location?.longitude != null
+      ) {
+        geoLocation = {
+          type:        'Point',
+          coordinates: [incidentData.location.longitude, incidentData.location.latitude],
+        };
+      }
 
       const incident = new Incident({
         ...incidentData,
         driverId,
-        driverName: driver.name,
-        driverPhone: driver.phone,
+        driverName:        driver.name,
+        driverPhone:       driver.phone,
         severity,
-        detectedAt: new Date(),
+        detectedAt:        new Date(),
         emergencyContacts: driver.emergencyContacts || [],
+        // Only set location when we have valid coords — schema field is optional
+        ...(geoLocation ? { location: geoLocation } : {}),
       });
 
       await incident.save();
 
       const incidentObject = (incident as any).toObject() as IIncident;
+
+      // Cache only when Redis is available
       await this.cacheIncident(incidentObject);
 
+      // Notify emergency contacts if any
       if (driver.emergencyContacts?.length) {
         await notificationService.notifyEmergencyContacts(
           driver.emergencyContacts,
-          incidentObject
+          incidentObject,
         );
       }
 
+      // Auto-assign only when location is known and severity warrants it
       await this.autoAssignResponder(incidentObject);
 
       logger.info(
-        `Incident created: ${incidentObject.incidentId} (Severity: ${incidentObject.severity})`
+        `Incident created: ${incidentObject.incidentId} ` +
+        `(Severity: ${incidentObject.severity}, ` +
+        `Location: ${geoLocation ? 'provided' : 'pending GPS'})`,
       );
 
       return incidentObject;
@@ -83,14 +103,14 @@ export class IncidentService {
   // ================= GET INCIDENT =================
   async getIncident(incidentId: string): Promise<IIncident | null> {
     try {
-      const cached = await redisClient.get(`incident:${incidentId}`);
-
-      if (cached) {
-        return JSON.parse(cached);
+      // Only hit Redis when the client is actually connected
+      if (redisClient.isReady) {
+        const cached = await redisClient.get(`incident:${incidentId}`);
+        if (cached) return JSON.parse(cached);
       }
 
       const incident = await Incident.findById(incidentId)
-        .populate('driverId', 'name phone email')
+        .populate('driverId',   'name phone email')
         .populate('hospitalId', 'hospitalName phone location');
 
       if (incident) {
@@ -106,12 +126,11 @@ export class IncidentService {
     }
   }
 
-  async getIncidentByNumber(
-    incidentNumber: string
-  ): Promise<IIncident | null> {
+  // ================= GET INCIDENT BY NUMBER =================
+  async getIncidentByNumber(incidentNumber: string): Promise<IIncident | null> {
     try {
       const incident = await Incident.findOne({ incidentId: incidentNumber })
-        .populate('driverId', 'name phone')
+        .populate('driverId',   'name phone')
         .populate('hospitalId', 'hospitalName');
 
       return incident ? (incident as any).toObject() as IIncident : null;
@@ -122,40 +141,28 @@ export class IncidentService {
   }
 
   // ================= UPDATE INCIDENT =================
-  async updateIncident(
-    incidentId: string,
-    updates: IUpdateIncidentDTO
-  ): Promise<IIncident> {
+  async updateIncident(incidentId: string, updates: IUpdateIncidentDTO): Promise<IIncident> {
     try {
       const incident = await Incident.findById(incidentId);
-
-      if (!incident) {
-        throw new Error('Incident not found');
-      }
+      if (!incident) throw new Error('Incident not found');
 
       const oldStatus = incident.status;
 
       Object.assign(incident, updates);
 
       if (updates.status) {
-        if (updates.status === 'confirmed') {
-          incident.confirmedAt = new Date();
-        }
-
-        if (['resolved', 'cancelled'].includes(updates.status)) {
-          incident.resolvedAt = new Date();
-        }
+        if (updates.status === 'confirmed') incident.confirmedAt = new Date();
+        if (['resolved', 'cancelled'].includes(updates.status)) incident.resolvedAt = new Date();
       }
 
       await incident.save();
 
       const updatedIncident = await Incident.findById(incidentId).lean() as unknown as IIncident;
-
       await this.cacheIncident(updatedIncident);
 
       if (oldStatus !== incident.status) {
         logger.info(
-          `Incident ${incident.incidentId} status changed ${oldStatus} → ${incident.status}`
+          `Incident ${incident.incidentId} status changed ${oldStatus} → ${incident.status}`,
         );
       }
 
@@ -169,31 +176,24 @@ export class IncidentService {
   }
 
   // ================= ACCEPT INCIDENT =================
-  async acceptIncident(
-    incidentId: string,
-    data: IAcceptIncidentDTO
-  ): Promise<IIncident> {
+  async acceptIncident(incidentId: string, data: IAcceptIncidentDTO): Promise<IIncident> {
     try {
       const incident = await Incident.findById(incidentId);
-
-      if (!incident) {
-        throw new Error('Incident not found');
-      }
+      if (!incident) throw new Error('Incident not found');
 
       const responderInfo = {
-        responderId: data.responderId,
-        id: data.responderId,
-        name: data.responderName,
-        type: 'ambulance',
-        hospital: data.hospitalId,
-        eta: data.eta,
-        distance: data.distance,
-        status: 'dispatched',
+        responderId:  data.responderId,
+        name:         data.responderName,
+        type:         'ambulance',
+        hospital:     data.hospitalId,
+        eta:          data.eta,
+        distance:     data.distance,
+        status:       'dispatched',
         dispatchedAt: new Date(),
       };
 
       incident.responders.push(responderInfo as any);
-      incident.status = 'dispatched';
+      incident.status     = 'dispatched';
       incident.hospitalId = data.hospitalId as any;
 
       await incident.save();
@@ -201,40 +201,34 @@ export class IncidentService {
       await HospitalStats.findOneAndUpdate(
         { hospitalId: data.hospitalId },
         {
-          $inc: {
-            activeIncidents: 1,
-            availableAmbulances: -1,
-            availableResponders: -1,
-          },
+          $inc: { activeIncidents: 1, availableAmbulances: -1, availableResponders: -1 },
           $set: { lastUpdated: new Date() },
         },
-        { upsert: true }
+        { upsert: true },
       );
 
       await ResponderStatus.findOneAndUpdate(
         { responderId: data.responderId },
         {
-          isAvailable: false,
-          currentIncidentId: incident._id,
-          status: 'en-route',
-          lastUpdate: new Date(),
+          isAvailable:        false,
+          currentIncidentId:  incident._id,
+          status:             'en-route',
+          lastUpdate:         new Date(),
         },
-        { upsert: true }
+        { upsert: true },
       );
 
       await notificationService.notifyDriver(
         incident.driverId.toString(),
         `Responder ${data.responderName} dispatched. ETA: ${data.eta} mins`,
-        { responder: responderInfo }
+        { responder: responderInfo },
       );
 
       logger.info(
-        `Incident ${incident.incidentId} accepted by responder ${data.responderName}`
+        `Incident ${incident.incidentId} accepted by responder ${data.responderName}`,
       );
 
-      const updatedIncident = await Incident.findById(incidentId).lean() as unknown as IIncident;
-
-      return updatedIncident;
+      return await Incident.findById(incidentId).lean() as unknown as IIncident;
     } catch (error) {
       logger.error('Accept incident error:', error);
       throw error;
@@ -258,21 +252,14 @@ export class IncidentService {
 
   // ================= ACTIVE INCIDENTS =================
   async getActiveIncidents(params: {
-    status?: string[];
+    status?:   string[];
     severity?: string[];
-    limit?: number;
+    limit?:    number;
   }): Promise<IIncident[]> {
     try {
-      // ✅ Fix
-const query: any = {};
-
-if (params.status?.length) {
-  query.status = { $in: params.status };
-}
-
-if (params.severity?.length) {
-  query.severity = { $in: params.severity };
-}
+      const query: any = {};
+      if (params.status?.length)   query.status   = { $in: params.status };
+      if (params.severity?.length) query.severity = { $in: params.severity };
 
       const incidents = await Incident.find(query)
         .sort({ severity: -1, detectedAt: -1 })
@@ -292,47 +279,32 @@ if (params.severity?.length) {
     try {
       const startDate = this.getStartDate(period as 'day' | 'week' | 'month' | 'year');
 
-      const severityStats = await Incident.aggregate([
-        {
-          $match: { detectedAt: { $gte: startDate } }
-        },
-        {
-          $group: {
-            _id: '$severity',
-            count: { $sum: 1 }
-          }
-        }
+      const [total, severityStats, statusStats, typeStats, avgResponseTime] = await Promise.all([
+        Incident.countDocuments({ detectedAt: { $gte: startDate } }),
+        Incident.aggregate([
+          { $match: { detectedAt: { $gte: startDate } } },
+          { $group: { _id: '$severity', count: { $sum: 1 } } },
+        ]),
+        Incident.aggregate([
+          { $match: { detectedAt: { $gte: startDate } } },
+          { $group: { _id: '$status', count: { $sum: 1 } } },
+        ]),
+        Incident.aggregate([
+          { $match: { detectedAt: { $gte: startDate } } },
+          { $group: { _id: '$type', count: { $sum: 1 } } },
+        ]),
+        this.calculateAverageResponseTime(startDate),
       ]);
 
-      const total = await Incident.countDocuments({ detectedAt: { $gte: startDate } });
-
-      const statusStats = await Incident.aggregate([
-        {
-          $match: { detectedAt: { $gte: startDate } }
-        },
-        {
-          $group: {
-            _id: '$status',
-            count: { $sum: 1 }
-          }
-        }
-      ]);
-const typeStats = await Incident.aggregate([
-  { $match: { detectedAt: { $gte: startDate } } },
-  { $group: { _id: '$type', count: { $sum: 1 } } }
-]);
-
-const avgResponseTime = await this.calculateAverageResponseTime(startDate);
-
-return {
-  period,
-  startDate,
-  total,
-  byType:     typeStats,       // ✅ new
-  bySeverity: severityStats,
-  byStatus:   statusStats,
-  averageResponseTime: avgResponseTime,
-};
+      return {
+        period,
+        startDate,
+        total,
+        byType:              typeStats,
+        bySeverity:          severityStats,
+        byStatus:            statusStats,
+        averageResponseTime: avgResponseTime,
+      };
     } catch (error) {
       logger.error('Get incident stats error:', error);
       throw error;
@@ -341,96 +313,90 @@ return {
 
   // ================= SEVERITY CALCULATION =================
   private calculateSeverity(
-    impactForce: number,
-    speed: number,
-    airbagDeployed: boolean
+    impactForce:    number,
+    speed:          number,
+    airbagDeployed: boolean,
   ): IncidentSeverity {
     if (
       airbagDeployed ||
       impactForce >= this.SEVERITY_THRESHOLDS.critical.impactForce ||
-      speed >= this.SEVERITY_THRESHOLDS.critical.speed
-    ) {
-      return 'critical';
-    }
+      speed       >= this.SEVERITY_THRESHOLDS.critical.speed
+    ) return 'critical';
 
     if (
       impactForce >= this.SEVERITY_THRESHOLDS.high.impactForce ||
-      speed >= this.SEVERITY_THRESHOLDS.high.speed
-    ) {
-      return 'high';
-    }
+      speed       >= this.SEVERITY_THRESHOLDS.high.speed
+    ) return 'high';
 
     if (
       impactForce >= this.SEVERITY_THRESHOLDS.medium.impactForce ||
-      speed >= this.SEVERITY_THRESHOLDS.medium.speed
-    ) {
-      return 'medium';
-    }
+      speed       >= this.SEVERITY_THRESHOLDS.medium.speed
+    ) return 'medium';
 
     return 'low';
   }
 
   // ================= CACHE =================
-  private async cacheIncident(incident: IIncident) {
+  private async cacheIncident(incident: IIncident): Promise<void> {
     try {
+      // Skip silently when Redis is not configured / not connected
+      if (!redisClient.isReady) return;
+
       await redisClient.setEx(
         `incident:${incident._id}`,
         this.INCIDENT_CACHE_TTL,
-        JSON.stringify(incident)
+        JSON.stringify(incident),
       );
     } catch (error) {
-      logger.error('Incident cache error:', error);
+      // Cache failures must never crash the main flow — log and continue
+      logger.warn('Incident cache write failed (non-fatal):', error);
     }
   }
 
   // ================= AUTO RESPONDER ASSIGN =================
-  private async autoAssignResponder(incident: IIncident) {
+  private async autoAssignResponder(incident: IIncident): Promise<void> {
     try {
+      // Only auto-dispatch for high-priority incidents
       if (!['critical', 'high'].includes(incident.severity)) return;
+
+      // Location must be present — it may still be pending GPS resolution
+      if (!incident.location) {
+        logger.debug(
+          `Auto-dispatch skipped for ${incident.incidentId}: location not yet available`,
+        );
+        return;
+      }
 
       if (typeof responderService.autoDispatch === 'function') {
         const assignment: any = await responderService.autoDispatch(
           incident._id.toString(),
-          incident.location
+          incident.location,
         );
-
         if (assignment) {
           logger.info(`Auto responder dispatched for ${incident.incidentId}`);
         }
       } else {
-        logger.debug('Auto dispatch not implemented');
+        logger.debug('responderService.autoDispatch not implemented — skipping');
       }
     } catch (error) {
-      logger.warn('Auto responder assignment failed:', error);
+      // Auto-assign failure must not block incident creation
+      logger.warn('Auto responder assignment failed (non-fatal):', error);
     }
   }
 
-  // ================= HELPER METHODS =================
+  // ================= HELPERS =================
   private async calculateAverageResponseTime(startDate: Date): Promise<number> {
     try {
       const result = await Incident.aggregate([
-        {
-          $match: {
-            detectedAt: { $gte: startDate },
-            confirmedAt: { $exists: true }
-          }
-        },
+        { $match: { detectedAt: { $gte: startDate }, confirmedAt: { $exists: true } } },
         {
           $project: {
             responseTime: {
-              $divide: [
-                { $subtract: ['$confirmedAt', '$detectedAt'] },
-                1000 * 60
-              ]
-            }
-          }
+              $divide: [{ $subtract: ['$confirmedAt', '$detectedAt'] }, 1000 * 60],
+            },
+          },
         },
-        {
-          $group: {
-            _id: null,
-            average: { $avg: '$responseTime' }
-          }
-        }
+        { $group: { _id: null, average: { $avg: '$responseTime' } } },
       ]);
 
       return result.length > 0 ? Math.round(result[0].average * 10) / 10 : 0;
@@ -442,18 +408,12 @@ return {
 
   private getStartDate(timeframe: 'day' | 'week' | 'month' | 'year'): Date {
     const now = new Date();
-
     switch (timeframe) {
-      case 'day':
-        return new Date(now.setDate(now.getDate() - 1));
-      case 'week':
-        return new Date(now.setDate(now.getDate() - 7));
-      case 'month':
-        return new Date(now.setMonth(now.getMonth() - 1));
-      case 'year':
-        return new Date(now.setFullYear(now.getFullYear() - 1));
-      default:
-        return new Date(now.setMonth(now.getMonth() - 1));
+      case 'day':   return new Date(now.setDate(now.getDate() - 1));
+      case 'week':  return new Date(now.setDate(now.getDate() - 7));
+      case 'month': return new Date(now.setMonth(now.getMonth() - 1));
+      case 'year':  return new Date(now.setFullYear(now.getFullYear() - 1));
+      default:      return new Date(now.setMonth(now.getMonth() - 1));
     }
   }
 }

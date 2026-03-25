@@ -1,10 +1,23 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { body, param, query } from 'express-validator';
 import * as notificationController from '../controllers/notification.controller';
 import { authenticate, requireDriver } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validation.middleware';
 
 const router = Router();
+
+/* ── Cache-busting middleware for receipts ──
+   Express auto-generates ETags and short-circuits with 304 before the
+   controller runs. This middleware strips ETag/cache headers so every
+   request reaches the controller and returns fresh data.
+─────────────────────────────────────────────────────────────────────── */
+const noCache = (_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.removeHeader('ETag');
+  next();
+};
 
 /* ── Notification preferences ── */
 router.get('/prefs',
@@ -67,11 +80,15 @@ router.post('/escalate/:incidentId/resolve',
 
 /* ── Delivery receipts ── */
 router.get('/receipts',
+  noCache,          // ← prevents Express ETag 304 short-circuit
   authenticate,
   validate([
     query('page').optional().isInt({ min: 1 }).toInt(),
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
-    query('status').optional().isIn(['pending', 'sent', 'delivered', 'failed', 'read']),
+    // FIX: frontend only sends 'pending' | 'delivered' | 'failed'
+    // removed 'sent' and 'read' from valid query values since those
+    // are internal DB states — the controller maps them automatically
+    query('status').optional().isIn(['pending', 'delivered', 'failed']),
   ]),
   notificationController.getDeliveryReceipts,
 );

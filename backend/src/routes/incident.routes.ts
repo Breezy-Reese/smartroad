@@ -7,7 +7,8 @@ import { emergencyLimiter } from '../middleware/rateLimiter.middleware';
 
 const router = Router();
 
-// Validation rules
+/* ── Validation rules ── */
+
 const createIncidentValidation = [
   body('type')
     .notEmpty().withMessage('Incident type is required')
@@ -30,8 +31,16 @@ const createIncidentValidation = [
   body('vehicleNumber')
     .optional()
     .isString().withMessage('Vehicle number must be a string'),
+  // FIX: location is now optional — driver may not have GPS at time of trigger.
+  // The hook will patch it in via PATCH /:incidentId/location once GPS resolves.
   body('location')
-    .notEmpty().withMessage('Location is required'),
+    .optional(),
+  body('location.latitude')
+    .optional()
+    .isFloat({ min: -90, max: 90 }).withMessage('Invalid latitude'),
+  body('location.longitude')
+    .optional()
+    .isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude'),
 ];
 
 const incidentIdParamValidation = [
@@ -43,82 +52,97 @@ const paginationValidation = [
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
 ];
 
-// Routes
+const updateLocationValidation = [
+  param('incidentId').isMongoId().withMessage('Invalid incident ID format'),
+  body('location.latitude').isFloat({ min: -90, max: 90 }).withMessage('Invalid latitude'),
+  body('location.longitude').isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude'),
+];
+
+/* ── Routes ── */
+
 router.post('/',
   authenticate,
   requireDriver,
   emergencyLimiter,
   validate(createIncidentValidation),
-  incidentController.createIncident
+  incidentController.createIncident,
 );
 
 router.get('/active',
   authenticate,
   authorize('hospital', 'admin'),
-  incidentController.getActiveIncidents
+  incidentController.getActiveIncidents,
 );
 
 router.get('/stats',
   authenticate,
   authorize('admin', 'hospital'),
-  incidentController.getIncidentStats
+  incidentController.getIncidentStats,
+);
+
+router.get('/user/:userId',
+  authenticate,
+  validate(paginationValidation),
+  incidentController.getUserIncidents,
 );
 
 router.get('/:incidentId',
   authenticate,
   validate(incidentIdParamValidation),
-  incidentController.getIncident
+  incidentController.getIncident,
 );
 
 router.put('/:incidentId',
   authenticate,
   authorize('hospital', 'admin'),
   validate(incidentIdParamValidation),
-  incidentController.updateIncidentStatus
+  incidentController.updateIncidentStatus,
+);
+
+// FIX: new route — patches location onto an existing incident once GPS becomes available
+router.patch('/:incidentId/location',
+  authenticate,
+  requireDriver,
+  validate(updateLocationValidation),
+  incidentController.updateIncidentLocation,
 );
 
 router.post('/:incidentId/accept',
   authenticate,
   requireHospital,
   validate(incidentIdParamValidation),
-  incidentController.acceptIncident
-);
-
-router.get('/user/:userId',
-  authenticate,
-  validate(paginationValidation),
-  incidentController.getUserIncidents
+  incidentController.acceptIncident,
 );
 
 router.post('/:incidentId/responder/:responderId/location',
   authenticate,
   authorize('responder'),
-  incidentController.updateResponderLocation
+  incidentController.updateResponderLocation,
 );
 
 router.post('/:incidentId/responder/:responderId/arrived',
   authenticate,
   authorize('responder'),
-  incidentController.markResponderArrived
+  incidentController.markResponderArrived,
 );
 
 router.post('/:incidentId/resolve',
   authenticate,
   authorize('responder', 'hospital', 'admin'),
-  incidentController.resolveIncident
+  incidentController.resolveIncident,
 );
 
 router.post('/:incidentId/cancel',
   authenticate,
   authorize('driver', 'hospital', 'admin'),
-  incidentController.cancelIncident
+  incidentController.cancelIncident,
 );
 
 router.get('/:incidentId/report',
   authenticate,
   authorize('hospital', 'admin'),
   validate(incidentIdParamValidation),
-  incidentController.generateIncidentReport
+  incidentController.generateIncidentReport,
 );
 
 export default router;
